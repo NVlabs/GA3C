@@ -54,7 +54,7 @@ All the configurations are in `Config.py`
 As mentioned before, one useful way of modifying a config is to pass it as an argument to `_train.sh`. For example, to save the models while training, just run: `train.sh TRAINERS=4`.
 
 ## Sample learning curves
-Yypical learning curves for Pong and Boxing are shown here. These are easily obtained from the results.txt file.
+Typical learning curves for Pong and Boxing are shown here. These are easily obtained from the results.txt file.
 ![Convergence Curves](http://mb2.web.engr.illinois.edu/images/pong_boxing.png)
 
 ### References ###
