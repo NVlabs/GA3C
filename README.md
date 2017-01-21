@@ -13,9 +13,9 @@ A hybrid CPU/GPU version of the Asynchronous Advantage Actor-Critic (A3C) algori
 ## How to Train a model from scratch? ###
 
 Run `sh _clean.sh` first, and then `sh _train.sh`.
-The script `_clean.sh` cleans the checkpoints folder, which contains the network models saved during the training process, as well as It also removes `results.txt`, which is a log of the scores achieved during training.
+The script `_clean.sh` cleans the checkpoints folder, which contains the network models saved during the training process, as well as removing `results.txt`, which is a log of the scores achieved during training.
 
-> Remember to save your trained models in a different folder if needed.
+> Remember to save your trained models and scores in a different folder if needed before cleaning.
 
 `_train.sh` launches the training procedure, following the parameters in `Config.py`.
 You can modify the training parameters directly in `Config.py`, or pass them as argument to `_train.sh`.
