@@ -62,22 +62,12 @@ Typical learning curves for Pong and Boxing are shown here. These are easily obt
 If you use this code, please refer to our oral presentation at the [The 1st International Workshop on Efficient Methods for Deep Neural Networks](http://allenai.org/plato/emdnn/papers.html), NIPS Workshop, Barcelona (Spain), Dec. 9, 2016:
 
 ```
-@ article
-{
-DBLP:journals/corr/BabaeizadehFTCK16,
-author = {Mohammad Babaeizadeh and
-Iuri Frosio and
-Stephen Tyree and
-Jason Clemons and
-Jan Kautz},
-title     = {{GA3C:} GPU-based {A3C} for Deep Reinforcement Learning},
-journal   = {CoRR},
-volume    = {abs/1611.06256},
-year      = {2016},
-url       = {http://arxiv.org/abs/1611.06256},
-timestamp = {Thu, 01 Dec 2016 19:32:08 +0100},
-biburl    = {http://dblp.uni-trier.de/rec/bib/journals/corr/BabaeizadehFTCK16},
-bibsource = {dblp computer science bibliography, http://dblp.org}
+@article{babaeizadeh2016ga3c,
+  title={{GA3C:} {GPU}-based {A3C} for Deep Reinforcement Learning},
+  author={Babaeizadeh, Mohammad and Frosio, Iuri and Tyree, Stephen and Clemons, Jason and Kautz, Jan},
+  journal={NIPS Workshop},
+  biurl={arXiv preprint arXiv:1611.06256},
+  year={2016}
 }
 ```
 
