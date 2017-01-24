@@ -129,4 +129,4 @@ class Server:
         while self.predictors:
             self.remove_predictor()
         while self.trainers:
-            self.add_trainer()
+            self.remove_trainer()
