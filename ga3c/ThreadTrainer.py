@@ -47,9 +47,9 @@ class ThreadTrainer(Thread):
                 if batch_size == 0:
                     x__ = x_; r__ = r_; a__ = a_
                 else:
-                    np.concatenate((x__, x_))
-                    np.concatenate((r__, r_))
-                    np.concatenate((a__, a_))
+                    x__ = np.concatenate((x__, x_))
+                    r__ = np.concatenate((r__, r_))
+                    a__ = np.concatenate((a__, a_))
                 batch_size += x_.shape[0]
             
             if Config.TRAIN_MODELS:

@@ -108,7 +108,7 @@ class Config:
     # Epsilon (regularize policy lag in GA3C)
     LOG_EPSILON = 1e-6
     # Training min batch size - increasing the batch size increases the stability of the algorithm, but make learning slower
-    TRAINING_MIN_BATCH_SIZE = 00
+    TRAINING_MIN_BATCH_SIZE = 0
     
     #########################################################################
     # Log and save
