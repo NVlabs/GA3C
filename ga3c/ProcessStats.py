@@ -67,6 +67,7 @@ class ProcessStats(Process):
             
             self.start_time = time.time()
             first_time = datetime.now()
+            results_logger.write('date, reward, step\n')
             while True:
                 episode_time, reward, length = self.episode_log_q.get()
                 results_logger.write('%s, %d, %d\n' % (episode_time.strftime("%Y-%m-%d %H:%M:%S"), reward, length))
