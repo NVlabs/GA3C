@@ -87,30 +87,30 @@ class NetworkVP:
         self.flat = tf.reshape(_input, shape=[-1, nb_elements._value])
         self.d1 = self.dense_layer(self.flat, 256, 'dense1')
 
-        self.logits_v = tf.squeeze(self.dense_layer(self.d1, 1, 'logits_v', func=None), squeeze_dims=[1])
-        self.cost_v = 0.5 * tf.reduce_sum(tf.square(self.y_r - self.logits_v), reduction_indices=0)
+        self.logits_v = tf.squeeze(self.dense_layer(self.d1, 1, 'logits_v', func=None), axis=[1])
+        self.cost_v = 0.5 * tf.reduce_sum(tf.square(self.y_r - self.logits_v), axis=0)
 
         self.logits_p = self.dense_layer(self.d1, self.num_actions, 'logits_p')
         if Config.USE_LOG_SOFTMAX:
             self.softmax_p = tf.nn.softmax(self.logits_p)
             self.log_softmax_p = tf.nn.log_softmax(self.logits_p)
-            self.log_selected_action_prob = tf.reduce_sum(self.log_softmax_p * self.action_index, reduction_indices=1)
+            self.log_selected_action_prob = tf.reduce_sum(self.log_softmax_p * self.action_index, axis=1)
 
             self.cost_p_1 = self.log_selected_action_prob * (self.y_r - tf.stop_gradient(self.logits_v))
             self.cost_p_2 = -1 * self.var_beta * \
-                        tf.reduce_sum(self.log_softmax_p * self.softmax_p, reduction_indices=1)
+                        tf.reduce_sum(self.log_softmax_p * self.softmax_p, axis=1)
         else:
             self.softmax_p = (tf.nn.softmax(self.logits_p) + Config.MIN_POLICY) / (1.0 + Config.MIN_POLICY * self.num_actions)
-            self.selected_action_prob = tf.reduce_sum(self.softmax_p * self.action_index, reduction_indices=1)
+            self.selected_action_prob = tf.reduce_sum(self.softmax_p * self.action_index, axis=1)
 
             self.cost_p_1 = tf.log(tf.maximum(self.selected_action_prob, self.log_epsilon)) \
                         * (self.y_r - tf.stop_gradient(self.logits_v))
             self.cost_p_2 = -1 * self.var_beta * \
                         tf.reduce_sum(tf.log(tf.maximum(self.softmax_p, self.log_epsilon)) *
-                                      self.softmax_p, reduction_indices=1)
+                                      self.softmax_p, axis=1)
         
-        self.cost_p_1_agg = tf.reduce_sum(self.cost_p_1, reduction_indices=0)
-        self.cost_p_2_agg = tf.reduce_sum(self.cost_p_2, reduction_indices=0)
+        self.cost_p_1_agg = tf.reduce_sum(self.cost_p_1, axis=0)
+        self.cost_p_2_agg = tf.reduce_sum(self.cost_p_2, axis=0)
         self.cost_p = -(self.cost_p_1_agg + self.cost_p_2_agg)
         
         if Config.DUAL_RMSPROP:
