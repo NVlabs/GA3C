@@ -5,7 +5,7 @@ A hybrid CPU/GPU version of the Asynchronous Advantage Actor-Critic (A3C) algori
 ## How do I get set up? ###
 
 * Install [Python > 3.0](https://www.python.org/)
-* Install [TensorFlow](https://www.tensorflow.org/get_started/os_setup.html) 
+* Install [TensorFlow 1.0](https://www.tensorflow.org/get_started/os_setup.html) 
 * Install [OpenAI Gym](https://github.com/openai/gym)
 * Clone the repo.
 * That's it folks!
