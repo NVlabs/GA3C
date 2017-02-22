@@ -35,7 +35,7 @@ def main():
     
     xaxis = time
     plt.plot(xaxis, reward, color='b', alpha=0.2)
-    plt.plot(xaxis, reward_smooth, label='reward', color='b')
+    plt.plot(xaxis, reward_smooth, color='b')
     
     plt.xlabel('hours')
     plt.ylabel('score')

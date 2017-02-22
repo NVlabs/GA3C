@@ -45,6 +45,7 @@ class NetworkVP:
         self.learning_rate = Config.LEARNING_RATE_START
         self.beta = Config.BETA_START
         self.log_epsilon = Config.LOG_EPSILON
+        self.rnn = True
 
         self.graph = tf.Graph()
         with self.graph.as_default() as g:
@@ -87,10 +88,63 @@ class NetworkVP:
         self.flat = tf.reshape(_input, shape=[-1, nb_elements._value])
         self.d1 = self.dense_layer(self.flat, 256, 'dense1')
 
-        self.logits_v = tf.squeeze(self.dense_layer(self.d1, 1, 'logits_v', func=None), squeeze_dims=[1])
+        #LSTM Layer 
+        if self.rnn: 
+            self.lstm = tf.nn.rnn_cell.BasicLSTMCell(256, state_is_tuple=True)     
+            batch_size = tf.shape(self.x)[0]
+            
+            self.step_size = tf.placeholder(tf.float32, [None], name='stepsize')
+  
+            d1_reshaped = tf.reshape(self.d1, [-1, batch_size, 256]) # T, N, D Config.TIME_MAX
+            #Fill d1_reshaped with 
+            
+            self.initial_lstm_state0 = tf.placeholder(tf.float32, [Config.AGENTS, 256])
+            self.initial_lstm_state1 = tf.placeholder(tf.float32, [Config.AGENTS, 256])
+            self.initial_lstm_state = tf.nn.rnn_cell.LSTMStateTuple(self.initial_lstm_state0,
+                                                                    self.initial_lstm_state1)  
+                                                                    
+                                             
+                                                      
+            if self.is_training:
+                need_reset_states = tf.reshape(tf.ones_like(self._input_is_over) - self._input_is_over, (-1, 1))
+                op_updates = [tf.scatter_update(initial_lstm_state[idx], self._input_agent_indexs, rnn_output_states_array[idx] * tf.cast(need_reset_states, rnn_output_states_array[idx].dtype)) \
+                              for idx in range(len(rnn_output_states_array))]
+            else:
+                # in predict mode, the is_over is for last state
+                batch_size = tf.shape(self._input_agent_indexs)[0]
+                op_updates = []
+                for idx in range(len(initial_lstm_state)):
+                    shape_states = tf.shape(initial_lstm_state[idx])
+                    op = tf.scatter_update(initial_lstm_state[idx], self._input_agent_indexs, tf.zeros((batch_size,shape_states[1]), dtype=initial_rnn_states[idx].dtype))
+                    op_resets.append(op)
+                    op = tf.scatter_update(initial_lstm_state[idx], self._input_agent_indexs, rnn_output_states_array[idx])
+                    op_updates.append(op)                                                        
+           
+            # Unrolling LSTM up to LOCAL_T_MAX time steps. (= 5time steps.)
+            # When episode terminates unrolling time steps becomes less than LOCAL_TIME_STEP.
+            # Unrolling step size is applied via self.step_size placeholder.
+            # When forward propagating, step_size is 1.
+            # (time_major = False, so output shape is [batch_size, max_time, cell.output_size])
+            lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(self.lstm,
+                                                        d1_reshaped,
+                                                        initial_state = self.initial_lstm_state,
+                                                        sequence_length = self.step_size,
+                                                        time_major = False)      
+                                                        #scope=scope)
+                                                        
+            #lstm_outputs: (1,5,256) for back prop, (1,1,256) for forward prop.
+            #lstm_outputs = tf.reshape(lstm_outputs, [-1,256])    
+            self._state = tf.reshape(lstm_outputs, [-1,256])  
+            
+                            
+        else:
+            self._state = self.d1
+
+
+        self.logits_v = tf.squeeze(self.dense_layer(self._state, 1, 'logits_v', func=None), squeeze_dims=[1])
         self.cost_v = 0.5 * tf.reduce_sum(tf.square(self.y_r - self.logits_v), reduction_indices=0)
 
-        self.logits_p = self.dense_layer(self.d1, self.num_actions, 'logits_p')
+        self.logits_p = self.dense_layer(self._state, self.num_actions, 'logits_p')
         if Config.USE_LOG_SOFTMAX:
             self.softmax_p = tf.nn.softmax(self.logits_p)
             self.log_softmax_p = tf.nn.log_softmax(self.logits_p)
