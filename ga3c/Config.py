@@ -48,9 +48,9 @@ class Config:
     # Number of Agents
     AGENTS = 32 
     # Number of Predictors
-    PREDICTORS = 2
+    PREDICTORS = 1
     # Number of Trainers
-    TRAINERS = 2
+    TRAINERS = 1
 
     # Device
     DEVICE = 'gpu:0'
@@ -59,6 +59,12 @@ class Config:
     DYNAMIC_SETTINGS = True
     DYNAMIC_SETTINGS_STEP_WAIT = 20
     DYNAMIC_SETTINGS_INITIAL_WAIT = 10
+    
+    
+    #########################################################################
+    # Software parameters
+    LIB = 'Torch'
+    
 
     #########################################################################
     # Algorithm parameters

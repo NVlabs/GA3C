@@ -30,12 +30,18 @@ import time
 
 from Config import Config
 from Environment import Environment
-from NetworkVP import NetworkVP
 from ProcessAgent import ProcessAgent
 from ProcessStats import ProcessStats
 from ThreadDynamicAdjustment import ThreadDynamicAdjustment
 from ThreadPredictor import ThreadPredictor
 from ThreadTrainer import ThreadTrainer
+
+if Config.LIB == 'TF':
+    from NetworkVP import NetworkVP
+elif Config.LIB == 'Torch':
+    from NetworkVP_torch import NetworkVP
+elif Config.LIB == 'Chainer':
+    from NetworkVP_chainer import NetworkVP
 
 
 class Server:
