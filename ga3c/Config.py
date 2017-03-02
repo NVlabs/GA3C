@@ -110,6 +110,9 @@ class Config:
     # Training min batch size - increasing the batch size increases the stability of the algorithm, but make learning slower
     TRAINING_MIN_BATCH_SIZE = 00
     
+    # Generalized Advantage Estimation
+    USE_GAE = False
+    
     #########################################################################
     # Log and save
 

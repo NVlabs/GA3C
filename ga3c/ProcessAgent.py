@@ -56,10 +56,14 @@ class ProcessAgent(Process):
     @staticmethod
     def _accumulate_rewards(experiences, discount_factor, terminal_reward):
         reward_sum = terminal_reward
+        value_plus = terminal_reward
         for t in reversed(range(0, len(experiences)-1)):
             r = np.clip(experiences[t].reward, Config.REWARD_MIN, Config.REWARD_MAX)
             reward_sum = discount_factor * reward_sum + r
-            experiences[t].reward = reward_sum
+            experiences[t].reward = reward_sum       
+            experiences[t].dt = r + discount_factor * value_plus
+            value_plus = experiences[t].value
+            
         return experiences[:-1]
 
     def convert_data(self, experiences):
@@ -89,6 +93,7 @@ class ProcessAgent(Process):
 
         time_count = 0
         reward_sum = 0.0
+        total_reward = 0.0
 
         while not done:
             # very first few frames
@@ -100,7 +105,7 @@ class ProcessAgent(Process):
             action = self.select_action(prediction)
             reward, done = self.env.step(action)
             reward_sum += reward
-            exp = Experience(self.env.previous_state, action, prediction, reward, done)
+            exp = Experience(self.env.previous_state, action, prediction, value, reward, done)
             experiences.append(exp)
 
             if done or time_count == Config.TIME_MAX:
