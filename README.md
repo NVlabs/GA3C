@@ -59,7 +59,18 @@ Typical learning curves for Pong and Boxing are shown here. These are easily obt
 
 ### References ###
 
-If you use this code, please refer to our oral presentation at the [The 1st International Workshop on Efficient Methods for Deep Neural Networks](http://allenai.org/plato/emdnn/papers.html), NIPS Workshop, Barcelona (Spain), Dec. 9, 2016:
+If you use this code, please refer to our [ICLR 2017 paper](https://openreview.net/forum?id=r1VGvBcxl):
+
+```
+@conference{babaeizadeh2017ga3c,
+  title={Reinforcement Learning thorugh Asynchronous Advantage Actor-Critic on a GPU},
+  author={Babaeizadeh, Mohammad and Frosio, Iuri and Tyree, Stephen and Clemons, Jason and Kautz, Jan},
+  booktitle={ICLR},
+  biurl={https://openreview.net/forum?id=r1VGvBcxl},
+  year={2017}
+}
+```
+and our oral presentation at the [The 1st International Workshop on Efficient Methods for Deep Neural Networks](http://allenai.org/plato/emdnn/papers.html), NIPS Workshop, Barcelona (Spain), Dec. 9, 2016:
 
 ```
 @article{babaeizadeh2016ga3c,
@@ -70,5 +81,3 @@ If you use this code, please refer to our oral presentation at the [The 1st Inte
   year={2016}
 }
 ```
-
-and our [ICLR 2017 submission](https://openreview.net/forum?id=r1VGvBcxl).
