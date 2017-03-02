@@ -49,6 +49,7 @@ class ProcessAgent(Process):
         self.actions = np.arange(self.num_actions)
 
         self.discount_factor = Config.DISCOUNT
+        self.tau = 1.0
         # one frame at a time
         self.wait_q = Queue(maxsize=1)
         self.exit_flag = Value('i', 0)
@@ -57,11 +58,14 @@ class ProcessAgent(Process):
     def _accumulate_rewards(experiences, discount_factor, terminal_reward):
         reward_sum = terminal_reward
         value_plus = terminal_reward
+        gae = 0
         for t in reversed(range(0, len(experiences)-1)):
             r = np.clip(experiences[t].reward, Config.REWARD_MIN, Config.REWARD_MAX)
             reward_sum = discount_factor * reward_sum + r
             experiences[t].reward = reward_sum       
-            experiences[t].dt = r + discount_factor * value_plus
+            delta_t = r + discount_factor * value_plus - experiences[t].value
+            gae = gae * discount_factor * 1.0 + delta_t
+            experiences[t].adv = gae          
             value_plus = experiences[t].value
             
         return experiences[:-1]
@@ -70,7 +74,12 @@ class ProcessAgent(Process):
         x_ = np.array([exp.state for exp in experiences])
         a_ = np.eye(self.num_actions)[np.array([exp.action for exp in experiences])].astype(np.float32)
         r_ = np.array([exp.reward for exp in experiences])
-        return x_, r_, a_
+        if Config.USE_GAE:
+            adv_ = np.array([exp.adv for exp in experiences])
+        else:
+            v = np.array([exp.value for exp in experiences])
+            adv_ = r_ - v
+        return x_, r_, a_, adv_
 
     def predict(self, state):
         # put the state in the prediction q
@@ -115,8 +124,8 @@ class ProcessAgent(Process):
                 if len(updated_exps) == 0:
                     yield None, None, None, total_reward
                 else:
-                    x_, r_, a_ = self.convert_data(updated_exps)
-                    yield x_, r_, a_, reward_sum
+                    x_, r_, a_, adv_ = self.convert_data(updated_exps)
+                    yield x_, r_, a_, adv_, reward_sum
 
                 # reset the tmax count
                 time_count = 0
@@ -134,10 +143,10 @@ class ProcessAgent(Process):
         while self.exit_flag.value == 0:
             total_reward = 0
             total_length = 0
-            for x_, r_, a_, reward_sum in self.run_episode():
+            for x_, r_, a_, adv_, reward_sum in self.run_episode():
                 total_reward += reward_sum
                 if x_ is None:
                     break
                 total_length += len(r_) + 1  # +1 for last frame that we drop
-                self.training_q.put((x_, r_, a_))
+                self.training_q.put((x_, r_, a_, adv_))
             self.episode_log_q.put((datetime.now(), total_reward, total_length))

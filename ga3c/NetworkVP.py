@@ -69,6 +69,7 @@ class NetworkVP:
         self.x = tf.placeholder(
             tf.float32, [None, self.img_height, self.img_width, self.img_channels], name='X')
         self.y_r = tf.placeholder(tf.float32, [None], name='Yr')
+        self.advantages = tf.placeholder(tf.float32, [None], name='advantages')
 
         self.var_beta = tf.placeholder(tf.float32, name='beta', shape=[])
         self.var_learning_rate = tf.placeholder(tf.float32, name='lr', shape=[])
@@ -91,12 +92,16 @@ class NetworkVP:
         self.cost_v = 0.5 * tf.reduce_sum(tf.square(self.y_r - self.logits_v), reduction_indices=0)
 
         self.logits_p = self.dense_layer(self.d1, self.num_actions, 'logits_p')
+        
+        if not Config.USE_GAE:
+            self.advantages = self.y_r - tf.stop_gradient(self.logits_v)
+            
         if Config.USE_LOG_SOFTMAX:
             self.softmax_p = tf.nn.softmax(self.logits_p)
             self.log_softmax_p = tf.nn.log_softmax(self.logits_p)
             self.log_selected_action_prob = tf.reduce_sum(self.log_softmax_p * self.action_index, reduction_indices=1)
-
-            self.cost_p_1 = self.log_selected_action_prob * (self.y_r - tf.stop_gradient(self.logits_v))
+            
+            self.cost_p_1 = self.log_selected_action_prob * self.advantages #(self.y_r - tf.stop_gradient(self.logits_v))
             self.cost_p_2 = -1 * self.var_beta * \
                         tf.reduce_sum(self.log_softmax_p * self.softmax_p, reduction_indices=1)
         else:
@@ -104,7 +109,8 @@ class NetworkVP:
             self.selected_action_prob = tf.reduce_sum(self.softmax_p * self.action_index, reduction_indices=1)
 
             self.cost_p_1 = tf.log(tf.maximum(self.selected_action_prob, self.log_epsilon)) \
-                        * (self.y_r - tf.stop_gradient(self.logits_v))
+                            *self.advantages
+                          #*(self.y_r - tf.stop_gradient(self.logits_v))
             self.cost_p_2 = -1 * self.var_beta * \
                         tf.reduce_sum(tf.log(tf.maximum(self.softmax_p, self.log_epsilon)) *
                                       self.softmax_p, reduction_indices=1)
@@ -232,9 +238,9 @@ class NetworkVP:
     def predict_p_and_v(self, x):
         return self.sess.run([self.softmax_p, self.logits_v], feed_dict={self.x: x})
     
-    def train(self, x, y_r, a, trainer_id):
+    def train(self, x, y_r, a, adv, trainer_id):
         feed_dict = self.__get_base_feed_dict()
-        feed_dict.update({self.x: x, self.y_r: y_r, self.action_index: a})
+        feed_dict.update({self.x: x, self.y_r: y_r, self.action_index: a, self.advantages: adv})
         self.sess.run(self.train_op, feed_dict=feed_dict)
 
     def log(self, x, y_r, a):

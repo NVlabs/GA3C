@@ -85,8 +85,8 @@ class Server:
         self.trainers[-1].join()
         self.trainers.pop()
 
-    def train_model(self, x_, r_, a_, trainer_id):
-        self.model.train(x_, r_, a_, trainer_id)
+    def train_model(self, x_, r_, a_, adv_, trainer_id):
+        self.model.train(x_, r_, a_, adv_, trainer_id)
         self.training_step += 1
         self.frame_counter += x_.shape[0]
 

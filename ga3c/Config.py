@@ -111,7 +111,7 @@ class Config:
     TRAINING_MIN_BATCH_SIZE = 00
     
     # Generalized Advantage Estimation
-    USE_GAE = False
+    USE_GAE = True
     
     #########################################################################
     # Log and save
