@@ -78,9 +78,9 @@ class Config:
     PREDICTION_BATCH_SIZE = 128
 
     # Input of the DNN
-    STACKED_FRAMES = 4
-    IMAGE_WIDTH = 84
-    IMAGE_HEIGHT = 84
+    STACKED_FRAMES = 2
+    IMAGE_WIDTH = 80
+    IMAGE_HEIGHT = 80
 
     # Total number of episodes and annealing frequency
     EPISODES = 400000
@@ -91,8 +91,8 @@ class Config:
     BETA_END = 0.01
 
     # Learning rate
-    LEARNING_RATE_START = 0.0003
-    LEARNING_RATE_END = 0.0003
+    LEARNING_RATE_START = 0.001
+    LEARNING_RATE_END = 0.001
 
     # RMSProp parameters
     RMSPROP_DECAY = 0.99
@@ -100,18 +100,18 @@ class Config:
     RMSPROP_EPSILON = 0.1
 
     # Dual RMSProp - we found that using a single RMSProp for the two cost function works better and faster
-    DUAL_RMSPROP = False
+    DUAL_RMSPROP = True
     
     # Gradient clipping
     USE_GRAD_CLIP = False
     GRAD_CLIP_NORM = 40.0 
     # Epsilon (regularize policy lag in GA3C)
-    LOG_EPSILON = 1e-6
+    LOG_EPSILON = 1e-1
     # Training min batch size - increasing the batch size increases the stability of the algorithm, but make learning slower
     TRAINING_MIN_BATCH_SIZE = 00
     
     # Generalized Advantage Estimation
-    USE_GAE = True
+    USE_GAE = False
     
     #########################################################################
     # Log and save
@@ -142,4 +142,4 @@ class Config:
     # Minimum policy
     MIN_POLICY = 0.0
     # Use log_softmax() instead of log(softmax())
-    USE_LOG_SOFTMAX = False
+    USE_LOG_SOFTMAX = True
