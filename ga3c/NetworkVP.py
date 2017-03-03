@@ -91,7 +91,7 @@ class NetworkVP:
         self.logits_v = tf.squeeze(self.dense_layer(self.d1, 1, 'logits_v', func=None), squeeze_dims=[1])
         self.cost_v = 0.5 * tf.reduce_sum(tf.square(self.y_r - self.logits_v), reduction_indices=0)
 
-        self.logits_p = self.dense_layer(self.d1, self.num_actions, 'logits_p')
+        self.logits_p = self.dense_layer(self.d1, self.num_actions, 'logits_p', func=None)
         
         if not Config.USE_GAE:
             self.advantages = self.y_r - tf.stop_gradient(self.logits_v)
