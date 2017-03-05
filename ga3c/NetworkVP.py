@@ -79,12 +79,9 @@ class NetworkVP:
         self.action_index = tf.placeholder(tf.float32, [None, self.num_actions])
         
         # As implemented in A3C paper
-        #self.n1 = self.conv2d_layer(self.x, 8, 16, 'conv11', strides=[1, 4, 4, 1])
-        #self.n2 = self.conv2d_layer(self.n1, 4, 32, 'conv12', strides=[1, 2, 2, 1])
-        #_input = self.n2
-        
-        #Karpathy pong Test
-        _input = self.x
+        self.n1 = self.conv2d_layer(self.x, 8, 16, 'conv11', strides=[1, 4, 4, 1])
+        self.n2 = self.conv2d_layer(self.n1, 4, 32, 'conv12', strides=[1, 2, 2, 1])
+        _input = self.n2
 
         flatten_input_shape = _input.get_shape()
         nb_elements = flatten_input_shape[1] * flatten_input_shape[2] * flatten_input_shape[3]
@@ -97,9 +94,6 @@ class NetworkVP:
 
         self.logits_p = self.dense_layer(self.d1, self.num_actions, 'logits_p', func=None)
         
-        #if not Config.USE_GAE:
-        #    self.advantages = self.y_r - tf.stop_gradient(self.logits_v)
-            
         if Config.USE_LOG_SOFTMAX:
             self.softmax_p = tf.nn.softmax(self.logits_p)
             self.log_softmax_p = tf.nn.log_softmax(self.logits_p)
