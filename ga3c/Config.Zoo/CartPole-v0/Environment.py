@@ -76,7 +76,7 @@ class Environment:
         x_ = np.transpose(x_, [1, 2, 0])  # move channels
         
         #Karpathy_pong test (to remove for other env)
-        x_[...,1] -= x_[...,0]
+        #x_[...,1] -= x_[...,0]
         return x_
     
     

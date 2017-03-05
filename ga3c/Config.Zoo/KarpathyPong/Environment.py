@@ -51,7 +51,17 @@ class Environment:
     @staticmethod
     def _rgb2gray(rgb):
         return np.dot(rgb[..., :3], [0.299, 0.587, 0.114])
-
+        
+          
+    @staticmethod
+    def preprocess_karpathy_pong(image):      
+          im = image[35:195] # crop
+          im = im[::2,::2,0] # downsample by factor of 2
+          im[im == 144] = 0 # erase background (background type 1)
+          im[im == 109] = 0 # erase background (background type 2) 
+          im[im != 0] = 1 # everything else (paddles, ball) just set to 1
+          return im.astype(np.float32)
+  
     @staticmethod
     def _preprocess(image):
         image = Environment._rgb2gray(image)
@@ -64,16 +74,22 @@ class Environment:
             return None  # frame queue is not full yet.
         x_ = np.array(self.frame_q.queue)
         x_ = np.transpose(x_, [1, 2, 0])  # move channels
+        
+        #Karpathy_pong test (to remove for other env)
+        x_[...,1] -= x_[...,0]
         return x_
-
+    
+    
     def _update_frame_q(self, frame):
         if self.frame_q.full():
             self.frame_q.get()
-        image = Environment._preprocess(frame)
+        image = Environment.preprocess_karpathy_pong(frame)
+        #image = Environment._preprocess(frame)
+       
         self.frame_q.put(image)
 
     def get_num_actions(self):
-        return len(self.game.env._action_set)
+        return self.game.env.action_space.n
 
     def reset(self):
         self.total_reward = 0
