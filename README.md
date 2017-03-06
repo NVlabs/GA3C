@@ -70,7 +70,7 @@ If you use this code, please refer to our [ICLR 2017 paper](https://openreview.n
   year={2017}
 }
 ```
-and our oral presentation at the [The 1st International Workshop on Efficient Methods for Deep Neural Networks](http://allenai.org/plato/emdnn/papers.html), NIPS Workshop, Barcelona (Spain), Dec. 9, 2016:
+This work was first presented in an oral talk at the [The 1st International Workshop on Efficient Methods for Deep Neural Networks](http://allenai.org/plato/emdnn/papers.html), NIPS Workshop, Barcelona (Spain), Dec. 9, 2016:
 
 ```
 @article{babaeizadeh2016ga3c,
