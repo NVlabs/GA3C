@@ -66,6 +66,7 @@ class ProcessAgent(Process):
         x_ = np.array([exp.state for exp in experiences])
         a_ = np.eye(self.num_actions)[np.array([exp.action for exp in experiences])].astype(np.float32)
         r_ = np.array([exp.reward for exp in experiences])
+        r_ = r_.reshape(r_.shape[0],1)
         return x_, r_, a_
 
     def predict(self, state):
@@ -81,6 +82,11 @@ class ProcessAgent(Process):
         else:
             action = np.random.choice(self.actions, p=prediction)
         return action
+        
+    def predict_pva(self,state):
+        self.prediction_q.put((self.id, state))
+        p, v, a = self.wait_q.get()
+        return p, v, a
 
     def run_episode(self):
         self.env.reset()
@@ -89,6 +95,7 @@ class ProcessAgent(Process):
 
         time_count = 0
         reward_sum = 0.0
+        total_reward = 0.0
 
         while not done:
             # very first few frames
@@ -98,6 +105,11 @@ class ProcessAgent(Process):
 
             prediction, value = self.predict(self.env.current_state)
             action = self.select_action(prediction)
+
+            #prediction, value, a = self.predict_pva(self.env.current_state)    
+            #action = action.cpu().data.numpy()
+            
+   
             reward, done = self.env.step(action)
             reward_sum += reward
             exp = Experience(self.env.previous_state, action, prediction, reward, done)
@@ -134,5 +146,5 @@ class ProcessAgent(Process):
                 if x_ is None:
                     break
                 total_length += len(r_) + 1  # +1 for last frame that we drop
-                self.training_q.put((x_, r_, a_))
+                self.training_q.put((self.id, x_, r_, a_))
             self.episode_log_q.put((datetime.now(), total_reward, total_length))

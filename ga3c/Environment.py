@@ -69,11 +69,13 @@ class Environment:
     def _update_frame_q(self, frame):
         if self.frame_q.full():
             self.frame_q.get()
-        image = Environment._preprocess(frame)
+        #image = Environment._preprocess(frame)
+        
+        image = frame[:,np.newaxis].astype(np.float32)
         self.frame_q.put(image)
 
     def get_num_actions(self):
-        return len(self.game.env._action_set)
+        return self.game.env.action_space.n
 
     def reset(self):
         self.total_reward = 0

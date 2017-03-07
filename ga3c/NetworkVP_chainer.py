@@ -31,7 +31,12 @@ Created on Fri Feb 10 15:51:40 2017
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
+import sys
+if sys.version_info >= (3,0):
+    from queue import Queue
+else:
+    from Queue import Queue
+    
 import re
 import numpy as np
 import chainer
@@ -39,69 +44,11 @@ from chainer import cuda
 from chainer import functions as F
 from chainer import links as L
 from chainer import optimizer
+from chainer import optimizers
 
 from Config import Config
 
-import time
-
-class RMSpropAsync(optimizer.GradientMethod):
-
-    """RMSprop for asynchronous methods.
-    
-    The only difference from chainer.optimizers.RMSprop in that the epsilon is
-    outside the square root."""
-
-    def __init__(self, lr=0.01, alpha=0.99, eps=1e-8):
-        self.lr = lr
-        self.alpha = alpha
-        self.eps = eps
-
-    def init_state(self, param, state):
-        xp = cuda.get_array_module(param.data)
-        state['ms'] = xp.zeros_like(param.data)
-
-    def update_one_cpu(self, param, state):
-        ms = state['ms']
-        grad = param.grad
-
-        ms *= self.alpha
-        ms += (1 - self.alpha) * grad * grad
-        param.data -= self.lr * grad / numpy.sqrt(ms + self.eps)
-
-    def update_one_gpu(self, param, state):
-        cuda.elementwise(
-            'T grad, T lr, T alpha, T eps',
-            'T param, T ms',
-            '''ms = alpha * ms + (1 - alpha) * grad * grad;
-               param -= lr * grad / sqrt(ms + eps);''',
-            'rmsprop')(param.grad, self.lr, self.alpha, self.eps,
-                       param.data, state['ms'])
-            
-class NonbiasWeightDecay(object):
-
-    """Optimizer hook function for weight decay regularization.
-
-    """
-    name = 'NonbiasWeightDecay'
-
-    def __init__(self, rate):
-        self.rate = rate
-
-    def __call__(self, opt):
-        if cuda.available:
-            kernel = cuda.elementwise(
-                'T p, T decay', 'T g', 'g += decay * p', 'weight_decay')
-
-        rate = self.rate
-        for name, param in opt.target.namedparams():
-            if name == 'b' or name.endswith('/b'):
-                continue
-            p, g = param.data, param.grad
-            with cuda.get_device(p) as dev:
-                if int(dev) == -1:
-                    g += rate * p
-                else:
-                    kernel(p, rate, g)
+#import time
 
 
 def init_like_torch(link):
@@ -112,50 +59,78 @@ def init_like_torch(link):
             out_channels, in_channels = l.W.data.shape
             stdv = 1 / np.sqrt(in_channels)
             l.W.data[:] = np.random.uniform(-stdv, stdv, size=l.W.data.shape)
-            if l.b is not None:
-                l.b.data[:] = np.random.uniform(-stdv, stdv,
-                                                size=l.b.data.shape)
+            l.b.data[:] = np.random.uniform(-stdv, stdv, size=l.b.data.shape)
         elif isinstance(l, L.Convolution2D):
             out_channels, in_channels, kh, kw = l.W.data.shape
             stdv = 1 / np.sqrt(in_channels * kh * kw)
             l.W.data[:] = np.random.uniform(-stdv, stdv, size=l.W.data.shape)
-            if l.b is not None:
-                l.b.data[:] = np.random.uniform(-stdv, stdv,
-                                                size=l.b.data.shape)
+            l.b.data[:] = np.random.uniform(-stdv, stdv, size=l.b.data.shape)
+            
 
 
 class a3c(chainer.ChainList):
 
-    def __init__(self, n_input_channels=4, num_actions=32, num_gpu=0, rnn=0, beta=1e-2):
+    def __init__(self, n_input_channels=4, num_actions=32, num_gpu=0, rnn=0):
         self.num_gpu = num_gpu
-        self.beta = beta
-        
+        self.beta = Config.BETA_START
+        self.log_epsilon = 1e-6
         outsize = 256
         bias = 0.1
-        self.activation = F.leaky_relu
         layers = [
-            L.Convolution2D(n_input_channels, 16, 8, stride=4, bias=bias,use_cudnn=1),
-            L.Convolution2D(16, 32, 4, stride=2, bias=bias,use_cudnn=1),
-            L.Linear(2592, outsize, bias=bias),
+            #L.Convolution2D(n_input_channels, 16, 8, stride=4, bias=bias,use_cudnn=1),
+            #L.Convolution2D(16, 32, 4, stride=2, bias=bias,use_cudnn=1),
+            #L.Linear(2592, outsize, bias=bias),
+            L.Linear(16, outsize, bias=bias), #for CartPole-v0
+            L.Linear(outsize, outsize, bias=bias),
             L.Linear(outsize, num_actions),
             L.Linear(outsize, 1),
         ]
         super(a3c, self).__init__(*layers)
-        
+        '''
+        max_num_agents=Config.AGENTS
+        tmax = Config.TIME_MAX
+        self.probs = [Queue(maxsize=tmax) for i in range(max_num_agents)]
+        self.values = [Queue(maxsize=tmax) for i in range(max_num_agents)]      
+        self.rnns = []
+        for i in range(max_num_agents):
+            self.rnns.append( a3c.make_initial_state(1, 256) )
+        print(len(self.rnns))
+        '''
         init_like_torch(self)
+     
+
+    @staticmethod
+    def make_initial_state(batchsize, n_units, train=True):
+        return {name: chainer.Variable(np.zeros((batchsize, n_units), dtype=np.float32), volatile=not train)
+                for name in ('c1', 'h1')} 
         
-    def __call__(self, state, y, action_index):           
-        state = np.moveaxis(state, 3, 1)
-        h = chainer.Variable(state)
+        
+    def predict_onestep(self, x, agent_idx):
+        return Exception('blah')
+        #h = chainer.Variable(x.reshape(x.shape[0],-1))
+        #h1_in = F.relu(self[0](h))
+        #c1, h1 = F.lstm(x['c1'], h1_in)
+     
+    def __call__(self, x, y, a):           
+        #state = np.moveaxis(state, 3, 1)
+        #h = chainer.Variable(state)
+        
+        h = chainer.Variable(x.reshape(x.shape[0],-1))
+        
+        y = y.astype(np.float32)
+        y = y.reshape(y.shape[0],1)
         if self.num_gpu >= 0:
-            h.to_gpu(self.num_gpu) 
-            y = y.reshape(y.shape[0],1)
+            h.to_gpu(self.num_gpu)          
             y = chainer.cuda.to_gpu(y,self.num_gpu) 
-            a = chainer.cuda.to_gpu(action_index,self.num_gpu)
+            a = chainer.cuda.to_gpu(a,self.num_gpu)
+            
 
         for layer in self[:-2]:
-            h = self.activation(layer(h))    
+            h = F.relu(layer(h))    
+        
         probs, v = F.softmax(self[-2](h)),self[-1](h)
+        
+        probs = F.relu(probs - self.log_epsilon)
         log_probs = F.log(probs)
 
         log_select_action_prob = F.sum( log_probs * a, axis=1 )
@@ -164,28 +139,24 @@ class a3c(chainer.ChainList):
         entropy = F.sum(probs * log_probs, axis=1)
         entropy = F.sum(self.beta * entropy, axis=0)
         vloss = (v-y)**2
-        vloss = F.reshape( F.sum( vloss, axis=0 ) , ())  / 4
-        loss = piloss + entropy
+        vloss = F.reshape( F.sum( vloss, axis=0 ) , ())  / 2
+        loss = piloss + entropy + vloss
         return loss
-
-    def pi_and_v(self, state, keep_same_state=False):
-        state = np.moveaxis(state, 3, 1)
-        h = chainer.Variable(state)
+    
+    def pi_and_v(self, x, keep_same_state=False):
+        #state = np.moveaxis(state, 3, 1)
+        h = chainer.Variable(x.reshape(x.shape[0],-1))
+        #h = chainer.Variable(state)
         if self.num_gpu >= 0:
             h.to_gpu(self.num_gpu)
         
         for layer in self[:-2]:
-            h = self.activation(layer(h))
-            
+            h = F.relu(layer(h))
+        
         probs, v = F.softmax(self[-2](h)),self[-1](h)
-        return cuda.to_cpu(probs.data),cuda.to_cpu(v.data)
-
-    def reset_state(self):
-        self.lstm.reset_state()
-
-    def unchain_backward(self):
-        self.lstm.h.unchain_backward()
-        self.lstm.c.unchain_backward()
+        return probs.data, v.data
+        #return cuda.to_cpu(probs.data),cuda.to_cpu(v.data)
+    
 
 
 class NetworkVP:
@@ -201,17 +172,21 @@ class NetworkVP:
         self.learning_rate = Config.LEARNING_RATE_START
         self.beta = Config.BETA_START
         self.log_epsilon = Config.LOG_EPSILON      
-        self.n_gpu = 0
+        self.n_gpu = -1
         self.model = a3c(num_actions=num_actions,num_gpu=self.n_gpu)
           
         if self.n_gpu >= 0:
             self.model.to_gpu(self.n_gpu)
+
+   
+        #self.opt = optimizers.RMSprop(lr=1e-4,alpha=0.99,eps=1e-1)
+        self.opt = optimizers.RMSpropGraves(lr=1e-4,alpha=0.99,eps=1e-1,momentum=0.0)
+        #self.opt = optimizers.Adam(alpha=0.001, beta1=0.9, beta2=0.999, eps=1e-8)
         
-        
-        self.opt = RMSpropAsync(lr=1e-4,eps=1e-1,alpha=0.99)      
         self.opt.setup(self.model)
-        self.opt.add_hook(chainer.optimizer.GradientClipping(40.0))
+        #self.opt.add_hook(chainer.optimizer.GradientClipping(100.0))
         #self.opt.add_hook(NonbiasWeightDecay(1e-5))
+        
 
     def _create_graph(self):
         return Exception('not implemented')
@@ -220,19 +195,20 @@ class NetworkVP:
         return Exception('not implemented')
 
 
-    def predict_p_and_v(self, x):
+    def predict_p_and_v(self, x, agent_index):  
         p, v = self.model.pi_and_v(x)
+        #p, v = self.model.predict_onestep(x,agent_index)
         return p, v
     
-    def train(self, x, y_r, a, trainer_id):        
+    def train(self, x, y_r, a, trainer_id):    
         self.model.zerograds()
         
-        st = time.time()
+        #st = time.time()
         self.model(x, y_r, a).backward()
          
-        #norm = self.opt.compute_grads_norm()
-        self.opt.update(  )
-        print( 'total :',(time.time()-st)*1000, ' ms')
+
+        self.opt.update()
+        #print( 'total :',(time.time()-st)*1000, ' ms')
         
 
     def log(self, x, y_r, a):

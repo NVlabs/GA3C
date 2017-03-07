@@ -55,7 +55,10 @@ class ThreadPredictor(Thread):
                 size += 1
 
             batch = states[:size]
-            p, v = self.server.model.predict_p_and_v(batch)
+            idx = ids[:size]
+
+            p, v = self.server.model.predict_p_and_v(batch, idx)
+            #p, v, a = self.server.model.predict_pva(batch, ids)
 
             for i in range(size):
                 if ids[i] < len(self.server.agents):
