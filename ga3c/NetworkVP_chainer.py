@@ -86,16 +86,7 @@ class a3c(chainer.ChainList):
             L.Linear(outsize, 1),
         ]
         super(a3c, self).__init__(*layers)
-        '''
-        max_num_agents=Config.AGENTS
-        tmax = Config.TIME_MAX
-        self.probs = [Queue(maxsize=tmax) for i in range(max_num_agents)]
-        self.values = [Queue(maxsize=tmax) for i in range(max_num_agents)]      
-        self.rnns = []
-        for i in range(max_num_agents):
-            self.rnns.append( a3c.make_initial_state(1, 256) )
-        print(len(self.rnns))
-        '''
+
         init_like_torch(self)
      
 
@@ -110,6 +101,42 @@ class a3c(chainer.ChainList):
         #h = chainer.Variable(x.reshape(x.shape[0],-1))
         #h1_in = F.relu(self[0](h))
         #c1, h1 = F.lstm(x['c1'], h1_in)
+        
+    @staticmethod
+    def piloss(probs, v, y, a, log_epsilon=1e-6):
+        probs = F.relu(probs - log_epsilon)
+        log_probs = F.log(probs)
+
+        log_select_action_prob = F.sum( log_probs * a, axis=1 )
+        adv = F.reshape((y - v.data), log_select_action_prob.data.shape)          
+        piloss = -F.sum(log_select_action_prob * adv, axis=0) #we lose 10 ms here!
+        entropy = F.sum(probs * log_probs, axis=1)
+        entropy = F.sum(0.001 * entropy, axis=0)
+        loss = piloss + entropy 
+        #print(piloss.data, entropy.data, vloss.data)
+        return loss
+    
+    @staticmethod
+    def vloss(v, y):
+        vloss = (v-y)**2
+        vloss = F.reshape( F.sum( vloss, axis=0 ) , ())  / 2
+        return vloss
+    
+    @staticmethod   
+    def loss(probs, v, y, a, log_epsilon=1e-6):
+        probs = F.relu(probs - log_epsilon)
+        log_probs = F.log(probs)
+
+        log_select_action_prob = F.sum( log_probs * a, axis=1 )
+        adv = F.reshape((y - v.data), log_select_action_prob.data.shape)          
+        piloss = -F.sum(log_select_action_prob * adv, axis=0) #we lose 10 ms here!
+        entropy = F.sum(probs * log_probs, axis=1)
+        entropy = F.sum(0.001 * entropy, axis=0)
+        vloss = (v-y)**2
+        vloss = F.reshape( F.sum( vloss, axis=0 ) , ())  / 2
+        loss = piloss + entropy + vloss
+        #print(piloss.data, entropy.data, vloss.data)
+        return loss
      
     def __call__(self, x, y, a):           
         #state = np.moveaxis(state, 3, 1)
@@ -130,18 +157,9 @@ class a3c(chainer.ChainList):
         
         probs, v = F.softmax(self[-2](h)),self[-1](h)
         
-        probs = F.relu(probs - self.log_epsilon)
-        log_probs = F.log(probs)
-
-        log_select_action_prob = F.sum( log_probs * a, axis=1 )
-        adv = F.reshape((y - v.data), log_select_action_prob.data.shape)          
-        piloss = -F.sum(log_select_action_prob * adv, axis=0) #we lose 10 ms here!
-        entropy = F.sum(probs * log_probs, axis=1)
-        entropy = F.sum(self.beta * entropy, axis=0)
-        vloss = (v-y)**2
-        vloss = F.reshape( F.sum( vloss, axis=0 ) , ())  / 2
-        loss = piloss + entropy + vloss
-        return loss
+        #return a3c.piloss(probs,v,y,a)
+        return a3c.loss(probs,v,y,a) #todo : make this much faster
+        
     
     def pi_and_v(self, x, keep_same_state=False):
         #state = np.moveaxis(state, 3, 1)
@@ -154,10 +172,11 @@ class a3c(chainer.ChainList):
             h = F.relu(layer(h))
         
         probs, v = F.softmax(self[-2](h)),self[-1](h)
-        return probs.data, v.data
+        return probs, v
         #return cuda.to_cpu(probs.data),cuda.to_cpu(v.data)
-    
 
+
+#TODO : only thing we could do in TF side : maintain GPU data in GPU
 
 class NetworkVP:
     def __init__(self, device, model_name, num_actions):
@@ -180,36 +199,73 @@ class NetworkVP:
 
    
         #self.opt = optimizers.RMSprop(lr=1e-4,alpha=0.99,eps=1e-1)
-        self.opt = optimizers.RMSpropGraves(lr=1e-4,alpha=0.99,eps=1e-1,momentum=0.0)
-        #self.opt = optimizers.Adam(alpha=0.001, beta1=0.9, beta2=0.999, eps=1e-8)
+        self.opt = optimizers.RMSpropGraves(lr=1e-4,alpha=0.99,eps=1e-1) #,momentum=0.0)
+        #self.opt = optimizers.Adam(alpha=1e-4, beta1=0.9, beta2=0.999, eps=1e-8)
         
         self.opt.setup(self.model)
         #self.opt.add_hook(chainer.optimizer.GradientClipping(100.0))
-        #self.opt.add_hook(NonbiasWeightDecay(1e-5))
+        self.model.zerograds()
         
+        self.t = 0
 
     def _create_graph(self):
         return Exception('not implemented')
 
     def reset_state(self, idx):
         return Exception('not implemented')
-
+    
 
     def predict_p_and_v(self, x, agent_index):  
         p, v = self.model.pi_and_v(x)
-        #p, v = self.model.predict_onestep(x,agent_index)
-        return p, v
+        n = len(agent_index)
+        infos = []
+        if n == 1:
+            infos.append((p,v))
+        else:
+            pi = F.split_axis(p,n,axis=0)
+            vi = F.split_axis(v,n,axis=0)
+            for i in range(n):
+                infos.append((pi[i],vi[i]))
+                
+        return p.data, v.data, infos
+        #return p.data, v.data
     
-    def train(self, x, y_r, a, trainer_id):    
-        self.model.zerograds()
-        
-        #st = time.time()
-        self.model(x, y_r, a).backward()
-         
 
+
+    def train(self, x, y_r, a, trainer_id, episodes):        
+        self.model(x, y_r, a).backward()   
         self.opt.update()
-        #print( 'total :',(time.time()-st)*1000, ' ms')
+        self.model.zerograds()
+    
+    
+    #just to check that we cannot train on offpolicy trajectories
+    def train_offpolicy(self, x, y_r, a, trainer_id, episodes): 
+        self.model.zerograds()
+        #Gather probs
+        loss = 0
         
+        t = 0
+        for episode in episodes:
+            r = episode['r'].astype(np.float32)
+            a_ = episode['a']
+            i_ = episode['i']
+            n = len(i_)
+            pi, vi = [], []
+            for f in i_:
+                p,v = f
+                pi.append(p)
+                vi.append(v)
+            p = F.concat(pi,axis=0)
+            v = F.concat(vi,axis=0)
+            loss += a3c.loss(p,v,r,a_)
+            t += n
+        
+        #p = F.concat(pi, axis=0)
+        #v = F.concat(vi, axis=0)
+        #loss = a3c.loss(p,v,y_r.astype(np.float32), a)
+        loss.backward()
+        self.opt.update()
+
 
     def log(self, x, y_r, a):
         return Exception('not implemented')
