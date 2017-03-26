@@ -24,6 +24,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import sys
+if sys.version_info >= (3,0):
+    from queue import Empty
+else:
+    from Queue import Empty
+
 from datetime import datetime
 from multiprocessing import Process, Queue, Value
 
@@ -72,7 +78,12 @@ class ProcessAgent(Process):
         # put the state in the prediction q
         self.prediction_q.put((self.id, state))
         # wait for the prediction to come back
-        p, v = self.wait_q.get()
+        try:
+            p, v = self.wait_q.get(True, 10)
+        except Empty as e:
+            # Couldn't receive prediction in long time
+            # Predictors removed?
+            return None, None
         return p, v
 
     def select_action(self, prediction):
@@ -97,6 +108,10 @@ class ProcessAgent(Process):
                 continue
 
             prediction, value = self.predict(self.env.current_state)
+            if prediction is None and value is None:
+                # Fatal error, couldn't get prediction from predictors
+                break
+
             action = self.select_action(prediction)
             reward, done = self.env.step(action)
             reward_sum += reward

@@ -60,8 +60,17 @@ class ThreadPredictor(Thread):
 
             size = 1
             while size < Config.PREDICTION_BATCH_SIZE and not self.server.prediction_q.empty():
-                ids[size], states[size] = self.server.prediction_q.get()
-                size += 1
+                try:
+                    ids[size], states[size] = self.server.prediction_q.get(True, 0.001)
+                    size += 1
+                except Empty as e:
+                    if self.exit_flag:
+                        break
+            
+            # Make sure we are not supposed to exit
+            # exit_flag could change at any point during above lines
+            if self.exit_flag:
+                break
 
             batch = states[:size]
             p, v = self.server.model.predict_p_and_v(batch)
