@@ -26,9 +26,9 @@
 
 import sys
 if sys.version_info >= (3,0):
-    from queue import Queue as queueQueue
+    from queue import Empty, Queue as queueQueue
 else:
-    from Queue import Queue as queueQueue
+    from Queue import Empty, Queue as queueQueue
 
 from datetime import datetime
 from multiprocessing import Process, Queue, Value
@@ -51,6 +51,8 @@ class ProcessStats(Process):
         self.agent_count = Value('i', 0)
         self.total_frame_count = 0
 
+        self.exit_flag = Value('i', 0)
+
     def FPS(self):
         # average FPS from the beginning of the training (not current FPS)
         return np.ceil(self.total_frame_count / (time.time() - self.start_time))
@@ -67,8 +69,14 @@ class ProcessStats(Process):
             
             self.start_time = time.time()
             first_time = datetime.now()
-            while True:
-                episode_time, reward, length = self.episode_log_q.get()
+            episode_time = None
+            reward = None
+            length = None
+            while self.exit_flag.value == 0:
+                try:
+                    episode_time, reward, length = self.episode_log_q.get(True, 0.001)
+                except Empty as e:
+                    continue
                 results_logger.write('%s, %d, %d\n' % (episode_time.strftime("%Y-%m-%d %H:%M:%S"), reward, length))
                 results_logger.flush()
 

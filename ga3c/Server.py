@@ -84,7 +84,16 @@ class Server:
         self.trainers[-1].exit_flag = True
         self.trainers[-1].join()
         self.trainers.pop()
+    
+    def remove_stats(self):
+        self.stats.exit_flag.value = True
+        self.stats.join()
+        
+    def remove_adjustment(self):
+        self.dynamic_adjustment.exit_flag = True
+        self.dynamic_adjustment.join()
 
+    
     def train_model(self, x_, r_, a_, trainer_id):
         self.model.train(x_, r_, a_, trainer_id)
         self.training_step += 1
@@ -123,10 +132,18 @@ class Server:
 
             time.sleep(0.01)
 
-        self.dynamic_adjustment.exit_flag = True
+        # Remove dynamic adjustment first to avoid it creating new agents
+        # and whatnot
+        self.remove_adjustment()
+        # Set exit_flags already so each agent will stop when episode ends
+        # Without this removing all agents will take some time
+        for agent in self.agents:
+            agent.exit_flag.value = True
         while self.agents:
             self.remove_agent()
         while self.predictors:
             self.remove_predictor()
         while self.trainers:
             self.remove_trainer()
+        self.remove_stats()
+        
