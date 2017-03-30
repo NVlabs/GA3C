@@ -101,39 +101,19 @@ class a3c(chainer.ChainList):
         #h = chainer.Variable(x.reshape(x.shape[0],-1))
         #h1_in = F.relu(self[0](h))
         #c1, h1 = F.lstm(x['c1'], h1_in)
-        
-    @staticmethod
-    def piloss(probs, v, y, a, log_epsilon=1e-6):
-        probs = F.relu(probs - log_epsilon)
-        log_probs = F.log(probs)
-
-        log_select_action_prob = F.sum( log_probs * a, axis=1 )
-        adv = F.reshape((y - v.data), log_select_action_prob.data.shape)          
-        piloss = -F.sum(log_select_action_prob * adv, axis=0) #we lose 10 ms here!
-        entropy = F.sum(probs * log_probs, axis=1)
-        entropy = F.sum(0.001 * entropy, axis=0)
-        loss = piloss + entropy 
-        #print(piloss.data, entropy.data, vloss.data)
-        return loss
-    
-    @staticmethod
-    def vloss(v, y):
-        vloss = (v-y)**2
-        vloss = F.reshape( F.sum( vloss, axis=0 ) , ())  / 2
-        return vloss
     
     @staticmethod   
     def loss(probs, v, y, a, log_epsilon=1e-6):
         probs = F.relu(probs - log_epsilon)
         log_probs = F.log(probs)
-
+        adv = F.squeeze(y - v.data)    
+  
         log_select_action_prob = F.sum( log_probs * a, axis=1 )
-        adv = F.reshape((y - v.data), log_select_action_prob.data.shape)          
-        piloss = -F.sum(log_select_action_prob * adv, axis=0) #we lose 10 ms here!
+        piloss = -F.sum(log_select_action_prob * adv.data, axis=0) #we lose 10 ms here!
         entropy = F.sum(probs * log_probs, axis=1)
         entropy = F.sum(0.001 * entropy, axis=0)
         vloss = (v-y)**2
-        vloss = F.reshape( F.sum( vloss, axis=0 ) , ())  / 2
+        vloss = F.squeeze( F.sum( vloss, axis=0 ) )  / 2
         loss = piloss + entropy + vloss
         #print(piloss.data, entropy.data, vloss.data)
         return loss
@@ -170,9 +150,17 @@ class a3c(chainer.ChainList):
         
         for layer in self[:-2]:
             h = F.relu(layer(h))
+            
+            
+        h1_in = h + model.l1_h(state['h1'])
+        c1, h1 = F.lstm(state['c1'], h1_in)
+        h2_in = model.l2_x(F.dropout(h1, train=train)) + model.l2_h(state['h2'])
+        c2, h2 = F.lstm(state['c2'], h2_in)
+        y = model.l3(F.dropout(h2, train=train))
+        
         
         probs, v = F.softmax(self[-2](h)),self[-1](h)
-        return probs, v
+        return probs, v#, 
         #return cuda.to_cpu(probs.data),cuda.to_cpu(v.data)
 
 
@@ -215,24 +203,15 @@ class NetworkVP:
         return Exception('not implemented')
     
 
-    def predict_p_and_v(self, x, agent_index):  
-        p, v = self.model.pi_and_v(x)
-        n = len(agent_index)
-        infos = []
-        if n == 1:
-            infos.append((p,v))
-        else:
-            pi = F.split_axis(p,n,axis=0)
-            vi = F.split_axis(v,n,axis=0)
-            for i in range(n):
-                infos.append((pi[i],vi[i]))
-                
-        return p.data, v.data, infos
+    def predict_p_and_v(self, x, rnn_state=None):  
+        p, v, state = self.model.pi_and_v(x)
+        
+        return p.data, v.data #, infos
         #return p.data, v.data
     
 
 
-    def train(self, x, y_r, a, trainer_id, episodes):        
+    def train(self, x, y_r, a, trainer_id):        
         self.model(x, y_r, a).backward()   
         self.opt.update()
         self.model.zerograds()

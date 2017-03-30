@@ -28,6 +28,7 @@ import os
 import re
 import numpy as np
 import tensorflow as tf
+from tensorflow.contrib import rnn
 
 from Config import Config
 
@@ -45,7 +46,6 @@ class NetworkVP:
         self.learning_rate = Config.LEARNING_RATE_START
         self.beta = Config.BETA_START
         self.log_epsilon = Config.LOG_EPSILON
-        self.rnn = True
 
         self.graph = tf.Graph()
         with self.graph.as_default() as g:
@@ -76,11 +76,14 @@ class NetworkVP:
 
         self.global_step = tf.Variable(0, trainable=False, name='step')
 
-        # As implemented in A3C paper
-        self.n1 = self.conv2d_layer(self.x, 8, 16, 'conv11', strides=[1, 4, 4, 1])
-        self.n2 = self.conv2d_layer(self.n1, 4, 32, 'conv12', strides=[1, 2, 2, 1])
         self.action_index = tf.placeholder(tf.float32, [None, self.num_actions])
-        _input = self.n2
+        
+        # As implemented in A3C paper
+        #self.n1 = self.conv2d_layer(self.x, 8, 16, 'conv11', strides=[1, 4, 4, 1])
+        #self.n2 = self.conv2d_layer(self.n1, 4, 32, 'conv12', strides=[1, 2, 2, 1]) 
+        #_input = self.n2
+
+        _input = self.x
 
         flatten_input_shape = _input.get_shape()
         nb_elements = flatten_input_shape[1] * flatten_input_shape[2] * flatten_input_shape[3]
@@ -89,54 +92,44 @@ class NetworkVP:
         self.d1 = self.dense_layer(self.flat, 256, 'dense1')
 
         #LSTM Layer 
-        if self.rnn: 
-            self.lstm = tf.nn.rnn_cell.BasicLSTMCell(256, state_is_tuple=True)     
-            batch_size = tf.shape(self.x)[0]
+        if Config.USE_RNN:     
+            self.lstm = rnn.BasicLSTMCell(256, state_is_tuple=True)
             
-            self.step_size = tf.placeholder(tf.float32, [None], name='stepsize')
-  
-            d1_reshaped = tf.reshape(self.d1, [-1, batch_size, 256]) # T, N, D Config.TIME_MAX
-            #Fill d1_reshaped with 
+            #early_stop = tf.placeholder(tf.int32, [batch_size])
+            self.step_sizes = tf.placeholder(tf.int32, [None], name='stepsize') 
             
-            self.initial_lstm_state0 = tf.placeholder(tf.float32, [Config.AGENTS, 256])
-            self.initial_lstm_state1 = tf.placeholder(tf.float32, [Config.AGENTS, 256])
-            self.initial_lstm_state = tf.nn.rnn_cell.LSTMStateTuple(self.initial_lstm_state0,
-                                                                    self.initial_lstm_state1)  
+            #self.batch_size = tf.shape(self.step_sizes)[0]    
+            self.batch_size = tf.placeholder(tf.int32, name='batchsize')
+               
+            
+            d1 = tf.reshape(self.d1, [self.batch_size,-1,256])
+            #d10 = tf.reshape(self.d1, [-1,256])
+            
+            #now instead of reshaping, we need to pad input sequence into [batch_size,Config.TIME_MAX,256]
+            
+
+            self.c0 = tf.placeholder(tf.float32, [None, 256])
+            self.h0 = tf.placeholder(tf.float32, [None, 256])
+            self.initial_lstm_state = rnn.LSTMStateTuple(self.c0,self.h0)  
                                                                     
                                              
-                                                      
-            if self.is_training:
-                need_reset_states = tf.reshape(tf.ones_like(self._input_is_over) - self._input_is_over, (-1, 1))
-                op_updates = [tf.scatter_update(initial_lstm_state[idx], self._input_agent_indexs, rnn_output_states_array[idx] * tf.cast(need_reset_states, rnn_output_states_array[idx].dtype)) \
-                              for idx in range(len(rnn_output_states_array))]
-            else:
-                # in predict mode, the is_over is for last state
-                batch_size = tf.shape(self._input_agent_indexs)[0]
-                op_updates = []
-                for idx in range(len(initial_lstm_state)):
-                    shape_states = tf.shape(initial_lstm_state[idx])
-                    op = tf.scatter_update(initial_lstm_state[idx], self._input_agent_indexs, tf.zeros((batch_size,shape_states[1]), dtype=initial_rnn_states[idx].dtype))
-                    op_resets.append(op)
-                    op = tf.scatter_update(initial_lstm_state[idx], self._input_agent_indexs, rnn_output_states_array[idx])
-                    op_updates.append(op)                                                        
-           
             # Unrolling LSTM up to LOCAL_T_MAX time steps. (= 5time steps.)
             # When episode terminates unrolling time steps becomes less than LOCAL_TIME_STEP.
             # Unrolling step size is applied via self.step_size placeholder.
             # When forward propagating, step_size is 1.
             # (time_major = False, so output shape is [batch_size, max_time, cell.output_size])
             lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(self.lstm,
-                                                        d1_reshaped,
+                                                        d1,
                                                         initial_state = self.initial_lstm_state,
-                                                        sequence_length = self.step_size,
-                                                        time_major = False)      
+                                                        sequence_length = self.step_sizes,
+                                                        time_major = False) # list of b
                                                         #scope=scope)
-                                                        
-            #lstm_outputs: (1,5,256) for back prop, (1,1,256) for forward prop.
-            #lstm_outputs = tf.reshape(lstm_outputs, [-1,256])    
+                                         
             self._state = tf.reshape(lstm_outputs, [-1,256])  
             
-                            
+            #self.W_lstm = tf.get_variable("basic_lstm_cell/weights")
+            #self.b_lstm = tf.get_variable("basic_lstm_cell/biases")
+                
         else:
             self._state = self.d1
 
@@ -283,12 +276,30 @@ class NetworkVP:
         prediction = self.sess.run(self.softmax_p, feed_dict={self.x: x})
         return prediction
     
-    def predict_p_and_v(self, x):
-        return self.sess.run([self.softmax_p, self.logits_v], feed_dict={self.x: x})
-    
-    def train(self, x, y_r, a, trainer_id):
+    #rnn version
+    def predict_p_and_v(self, x, c, h):
         feed_dict = self.__get_base_feed_dict()
-        feed_dict.update({self.x: x, self.y_r: y_r, self.action_index: a})
+        if Config.USE_RNN == False:     
+            feed_dict.update({self.x: x})
+            p, v = self.sess.run([self.softmax_p, self.logits_v], feed_dict=feed_dict)
+            return p, v, c, h
+        else:
+            step_sizes = np.ones((c.shape[0],),dtype=np.int32)       
+            feed_dict = self.__get_base_feed_dict()
+            feed_dict.update({self.x: x, self.step_sizes:step_sizes, self.c0:c, self.h0:h, self.batch_size:step_sizes.shape[0]})        
+            p, v, rnn_state = self.sess.run([self.softmax_p, self.logits_v, self.lstm_state], feed_dict=feed_dict)       
+            return p, v, rnn_state.c, rnn_state.h
+    
+    def train(self, x, y_r, a, c, h, l):
+        
+        r = np.reshape(y_r,(y_r.shape[0],))
+        feed_dict = self.__get_base_feed_dict()
+        
+        if Config.USE_RNN == False:        
+            feed_dict.update({self.x: x, self.y_r: r, self.action_index: a})
+        else:
+            step_sizes = np.array(l)
+            feed_dict.update({self.x: x, self.y_r: r, self.action_index: a, self.step_sizes:step_sizes, self.c0:c, self.h0:h, self.batch_size:len(l)})
         self.sess.run(self.train_op, feed_dict=feed_dict)
 
     def log(self, x, y_r, a):

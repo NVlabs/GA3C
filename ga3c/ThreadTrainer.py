@@ -38,22 +38,35 @@ class ThreadTrainer(Thread):
         self.id = id
         self.server = server
         self.exit_flag = False
-
+        
     def run(self):
         while not self.exit_flag:
             batch_size = 0
             ids = []
+            lengths = []
             while batch_size <= Config.TRAINING_MIN_BATCH_SIZE:
-                idx, x_, r_, a_ = self.server.training_q.get()
+                idx, x_, r_, a_, c_, h_ = self.server.training_q.get()
+                
+                t = x_.shape[0]
+                if t != Config.TIME_MAX and Config.USE_RNN:
+                    xt = np.zeros((Config.TIME_MAX, Config.IMAGE_HEIGHT, Config.IMAGE_WIDTH, Config.STACKED_FRAMES),dtype=np.float32)
+                    rt = np.zeros((Config.TIME_MAX,1),dtype=np.float32)
+                    at = np.zeros((Config.TIME_MAX, a_.shape[1]),dtype=np.float32)
+                    xt[:t] = x_; rt[:t] = r_; at[:t] = a_
+                    x_ = xt; r_ = rt; a_ = at;
+
+                lengths.append(x_.shape[0])
                 if batch_size == 0:
-                    x__ = x_; r__ = r_; a__ = a_
+                    x__ = x_; r__ = r_; a__ = a_; c__ = c_; h__ = h_; 
                 else:
                     x__ = np.concatenate((x__, x_))
                     r__ = np.concatenate((r__, r_))
                     a__ = np.concatenate((a__, a_))
+                    c__ = np.concatenate((c__,c_))
+                    h__ = np.concatenate((h__,h_))
+                
                 ids.append(idx)
                 batch_size += x_.shape[0]
             
             if Config.TRAIN_MODELS:
-                #self.server.train_model(x__, r__, a__, self.id)
-                self.server.train_model(x__, r__, a__, ids) 
+                self.server.train_model(x__, r__, a__,c__,h__, lengths) 

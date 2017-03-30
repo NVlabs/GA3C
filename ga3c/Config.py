@@ -30,7 +30,7 @@ class Config:
     # Game configuration
 
     # Name of the game, with version (e.g. PongDeterministic-v0)
-    ATARI_GAME = 'PongDeterministic-v0'
+    ATARI_GAME = 'CartPole-v0'
 
     # Enable to see the trained agent in action
     PLAY_MODE = False
@@ -46,25 +46,22 @@ class Config:
     
     # If the dynamic configuration is on, these are the initial values.
     # Number of Agents
-    AGENTS = 32 
+    AGENTS = 16
     # Number of Predictors
-    PREDICTORS = 1
+    PREDICTORS = 2
     # Number of Trainers
-    TRAINERS = 1
+    TRAINERS = 2
 
     # Device
-    DEVICE = 'gpu:0'
+    DEVICE = 'cpu:0'
 
     # Enable the dynamic adjustment (+ waiting time to start it)
     DYNAMIC_SETTINGS = True
     DYNAMIC_SETTINGS_STEP_WAIT = 20
     DYNAMIC_SETTINGS_INITIAL_WAIT = 10
     
-    
-    #########################################################################
-    # Software parameters
-    LIB = 'Torch'
-    
+    ##
+    LIB = 'TF'
 
     #########################################################################
     # Algorithm parameters
@@ -85,20 +82,21 @@ class Config:
 
     # Input of the DNN
     STACKED_FRAMES = 4
-    IMAGE_WIDTH = 84
-    IMAGE_HEIGHT = 84
+    IMAGE_WIDTH = 1
+    IMAGE_HEIGHT = 4
+    NCELLS = 256
 
     # Total number of episodes and annealing frequency
-    EPISODES = 400000
-    ANNEALING_EPISODE_COUNT = 400000
+    EPISODES = 4000
+    ANNEALING_EPISODE_COUNT = 4000
 
     # Entropy regualrization hyper-parameter
     BETA_START = 0.01
-    BETA_END = 0.01
+    BETA_END = 0.001
 
     # Learning rate
-    LEARNING_RATE_START = 0.0003
-    LEARNING_RATE_END = 0.0003
+    LEARNING_RATE_START = 0.0004
+    LEARNING_RATE_END = 0.0004
 
     # RMSProp parameters
     RMSPROP_DECAY = 0.99
@@ -114,7 +112,13 @@ class Config:
     # Epsilon (regularize policy lag in GA3C)
     LOG_EPSILON = 1e-6
     # Training min batch size - increasing the batch size increases the stability of the algorithm, but make learning slower
-    TRAINING_MIN_BATCH_SIZE = 00
+    TRAINING_MIN_BATCH_SIZE = 16
+    
+    # Generalized Advantage Estimation
+    USE_GAE = False
+    
+    # USE RNN - can help to converge but current version is much slower than FF
+    USE_RNN = False
     
     #########################################################################
     # Log and save
@@ -145,4 +149,4 @@ class Config:
     # Minimum policy
     MIN_POLICY = 0.0
     # Use log_softmax() instead of log(softmax())
-    USE_LOG_SOFTMAX = False
+    USE_LOG_SOFTMAX = True
