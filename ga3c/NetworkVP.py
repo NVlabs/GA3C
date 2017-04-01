@@ -49,7 +49,7 @@ class NetworkVP:
 
         self.graph = tf.Graph()
         with self.graph.as_default() as g:
-            with tf.device(self.device):
+            with tf.device(self.device), tf.variable_scope('net_') as self.scope:
                 self._create_graph()
 
                 self.sess = tf.Session(
@@ -89,50 +89,31 @@ class NetworkVP:
         nb_elements = flatten_input_shape[1] * flatten_input_shape[2] * flatten_input_shape[3]
 
         self.flat = tf.reshape(_input, shape=[-1, nb_elements._value])
-        self.d1 = self.dense_layer(self.flat, 256, 'dense1')
+        self.d0 = self.dense_layer(self.flat, 256, 'dense0')
+        self.d1 = self.dense_layer(self.d0, 256, 'dense1')
 
         #LSTM Layer 
         if Config.USE_RNN:     
-            self.lstm = rnn.BasicLSTMCell(256, state_is_tuple=True)
-            
-            #early_stop = tf.placeholder(tf.int32, [batch_size])
+            D = Config.NCELLS
+            self.lstm = rnn.BasicLSTMCell(D, state_is_tuple=True)
             self.step_sizes = tf.placeholder(tf.int32, [None], name='stepsize') 
-            
             #self.batch_size = tf.shape(self.step_sizes)[0]    
             self.batch_size = tf.placeholder(tf.int32, name='batchsize')
-               
+            d1 = tf.reshape(self.d1, [self.batch_size,-1,D])
             
-            d1 = tf.reshape(self.d1, [self.batch_size,-1,256])
-            #d10 = tf.reshape(self.d1, [-1,256])
-            
-            #now instead of reshaping, we need to pad input sequence into [batch_size,Config.TIME_MAX,256]
-            
-
-            self.c0 = tf.placeholder(tf.float32, [None, 256])
-            self.h0 = tf.placeholder(tf.float32, [None, 256])
+            self.c0 = tf.placeholder(tf.float32, [None, D])
+            self.h0 = tf.placeholder(tf.float32, [None, D])
             self.initial_lstm_state = rnn.LSTMStateTuple(self.c0,self.h0)  
-                                                                    
-                                             
-            # Unrolling LSTM up to LOCAL_T_MAX time steps. (= 5time steps.)
-            # When episode terminates unrolling time steps becomes less than LOCAL_TIME_STEP.
-            # Unrolling step size is applied via self.step_size placeholder.
-            # When forward propagating, step_size is 1.
-            # (time_major = False, so output shape is [batch_size, max_time, cell.output_size])
             lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(self.lstm,
                                                         d1,
                                                         initial_state = self.initial_lstm_state,
                                                         sequence_length = self.step_sizes,
-                                                        time_major = False) # list of b
-                                                        #scope=scope)
-                                         
-            self._state = tf.reshape(lstm_outputs, [-1,256])  
-            
-            #self.W_lstm = tf.get_variable("basic_lstm_cell/weights")
-            #self.b_lstm = tf.get_variable("basic_lstm_cell/biases")
-                
+                                                        time_major = False) 
+                                                        #scope=scope)                                 
+            self._state = tf.reshape(lstm_outputs, [-1,D])   + self.d1  #just in case, avoid vanishing gradient
+         
         else:
             self._state = self.d1
-
 
         self.logits_v = tf.squeeze(self.dense_layer(self._state, 1, 'logits_v', func=None), squeeze_dims=[1])
         self.cost_v = 0.5 * tf.reduce_sum(tf.square(self.y_r - self.logits_v), reduction_indices=0)

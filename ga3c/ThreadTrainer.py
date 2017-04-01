@@ -29,7 +29,6 @@ import numpy as np
 
 from Config import Config
 
-
 class ThreadTrainer(Thread):
     def __init__(self, server, id):
         super(ThreadTrainer, self).__init__()
@@ -38,16 +37,18 @@ class ThreadTrainer(Thread):
         self.id = id
         self.server = server
         self.exit_flag = False
-        
+                    
     def run(self):
         while not self.exit_flag:
             batch_size = 0
             ids = []
             lengths = []
+            #lengths_real = []
             while batch_size <= Config.TRAINING_MIN_BATCH_SIZE:
                 idx, x_, r_, a_, c_, h_ = self.server.training_q.get()
                 
                 t = x_.shape[0]
+                #lengths_real.append(t)
                 if t != Config.TIME_MAX and Config.USE_RNN:
                     xt = np.zeros((Config.TIME_MAX, Config.IMAGE_HEIGHT, Config.IMAGE_WIDTH, Config.STACKED_FRAMES),dtype=np.float32)
                     rt = np.zeros((Config.TIME_MAX,1),dtype=np.float32)
@@ -66,7 +67,8 @@ class ThreadTrainer(Thread):
                     h__ = np.concatenate((h__,h_))
                 
                 ids.append(idx)
-                batch_size += x_.shape[0]
+                batch_size += 1 #x_.shape[0] #we change meaning of batch
             
+            #print(lengths_real)
             if Config.TRAIN_MODELS:
                 self.server.train_model(x__, r__, a__,c__,h__, lengths) 

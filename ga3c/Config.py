@@ -81,10 +81,10 @@ class Config:
     PREDICTION_BATCH_SIZE = 128
 
     # Input of the DNN
-    STACKED_FRAMES = 4
+    STACKED_FRAMES = 1
     IMAGE_WIDTH = 1
     IMAGE_HEIGHT = 4
-    NCELLS = 256
+    
 
     # Total number of episodes and annealing frequency
     EPISODES = 4000
@@ -118,7 +118,8 @@ class Config:
     USE_GAE = False
     
     # USE RNN - can help to converge but current version is much slower than FF
-    USE_RNN = False
+    USE_RNN = True
+    NCELLS = 256
     
     #########################################################################
     # Log and save

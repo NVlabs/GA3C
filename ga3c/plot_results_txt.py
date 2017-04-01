@@ -12,16 +12,16 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--scores', type=str, default='results.txt')
-    args = parser.parse_args()
+tableau20 = [(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 120),  
+             (44, 160, 44), (152, 223, 138), (214, 39, 40), (255, 152, 150),  
+             (148, 103, 189), (197, 176, 213), (140, 86, 75), (196, 156, 148),  
+             (227, 119, 194), (247, 182, 210), (127, 127, 127), (199, 199, 199),  
+             (188, 189, 34), (219, 219, 141), (23, 190, 207), (158, 218, 229)] 
+for i in range(len(tableau20)):  
+    r, g, b = tableau20[i]  
+    tableau20[i] = (r / 255., g / 255., b / 255.)  
 
-    scores = pd.read_csv(args.scores, delimiter=', ')
-    
-    hour = scores['date']
-    reward = scores['reward']
-    
+def prepare_time_axis(hour):
     time = []
     sh0 = hour[0].split(' ')[1].split(':')
     t0 = int(sh0[0]) + float(sh0[1])/60.0 + float(sh0[2])/3600.0
@@ -42,17 +42,39 @@ def main():
         t = tt - t0 + dt
         time.append(t)
         tprev = tt
+        
+    return time
 
+def addplot(filename,ax,color,label):
+    scores = pd.read_csv(filename, delimiter=', ')
+    hour = scores['date']
+    reward = scores['reward']  
+    time = prepare_time_axis(hour)
+
+    mean_window = 100
+    std_window = 200
+    r_std = reward.rolling(window = std_window).std()
+    r = reward.rolling(window = mean_window).mean()
+
+    ax.plot(time, r, color=color,label=label)
+    ax.fill_between(time, r-r_std, r+r_std, color=color, alpha=0.2, linewidth=0)
     
-    smoothing = 100
-    reward_smooth = np.convolve(reward, np.ones((smoothing))/float(smoothing), 'same')
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--scores', type=str, default='results.txt')
+    args = parser.parse_args()
     
-    xaxis = time
-    plt.plot(xaxis, reward, color='b', alpha=0.2)
-    plt.plot(xaxis, reward_smooth, color='b')
+    fig, axarr = plt.subplots(1, sharex=True, figsize=(8, 8))
     
+    scores1 = 'results_ff.txt'
+    scores2 = 'results.txt'
+
+    addplot(scores1, axarr,tableau20[0],'batch16.ff')
+    addplot(scores2, axarr,tableau20[4],'batch16.lstm')
+
     plt.xlabel('hours')
-    plt.ylabel('score')
+    plt.ylabel('CartPole-V0.score')
     plt.legend(loc='best')
     fig_fname = args.scores + '.png'
     plt.savefig(fig_fname)
