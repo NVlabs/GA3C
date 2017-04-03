@@ -129,7 +129,7 @@ class ThreadTrainer(Thread):
                     c__ = np.concatenate((c__, c_))
                     h__ = np.concatenate((h__, h_))
                 
-                batch_size += 1 #x_.shape[0] #we change meaning of batch
+                batch_size += x_.shape[0] #we change meaning of batch
             
             #print(lengths_real)
             if Config.TRAIN_MODELS:
