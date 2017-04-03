@@ -29,6 +29,7 @@ import re
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import rnn
+from tensorflow.contrib.layers.python.layers import batch_norm as batch_norm
 
 from Config import Config
 
@@ -64,34 +65,43 @@ class NetworkVP:
                 if Config.LOAD_CHECKPOINT or Config.SAVE_MODELS:
                     vars = tf.global_variables()
                     self.saver = tf.train.Saver({var.name: var for var in vars}, max_to_keep=0)
-                
+
+    def ff_fc(self,_input, is_training=False):
+        flatten_input_shape = _input.get_shape()
+        nb_elements = flatten_input_shape[1] * flatten_input_shape[2] * flatten_input_shape[3]
+
+        flat = tf.reshape(_input, shape=[-1, nb_elements._value])
+        d0 = self.dense_layer(flat, 256, 'dense0')
+        #d0 = self.batch_norm_layer(d0, is_training, scope_bn='target_batch_norm_0', activation=tf.nn.relu)
+        d1 = self.dense_layer(d0, 256, 'dense1')
+        return d1
+    
+    def ff_cnn(self,_input):
+        n1 = self.conv2d_layer(_input, 8, 32, 'conv11', strides=[1, 4, 4, 1])
+        n2 = self.conv2d_layer(n1, 4, 64, 'conv12', strides=[1, 2, 2, 1]) 
+        return n2
+    
+    def switch_compute(self,_input,do_compute):
+        return Exception('blah')
+              
 
     def _create_graph(self):
-        self.x = tf.placeholder(
-            tf.float32, [None, self.img_height, self.img_width, self.img_channels], name='X')
+        self.x = tf.placeholder(tf.float32, [None, self.img_height, self.img_width, self.img_channels], name='X')
         self.y_r = tf.placeholder(tf.float32, [None], name='Yr')
 
         self.var_beta = tf.placeholder(tf.float32, name='beta', shape=[])
         self.var_learning_rate = tf.placeholder(tf.float32, name='lr', shape=[])
 
         self.global_step = tf.Variable(0, trainable=False, name='step')
+        
+        self.is_training = tf.placeholder(tf.bool)
+
 
         self.action_index = tf.placeholder(tf.float32, [None, self.num_actions])
         
-        # As implemented in A3C paper
-        #self.n1 = self.conv2d_layer(self.x, 8, 16, 'conv11', strides=[1, 4, 4, 1])
-        #self.n2 = self.conv2d_layer(self.n1, 4, 32, 'conv12', strides=[1, 2, 2, 1]) 
-        #_input = self.n2
-
         _input = self.x
-
-        flatten_input_shape = _input.get_shape()
-        nb_elements = flatten_input_shape[1] * flatten_input_shape[2] * flatten_input_shape[3]
-
-        self.flat = tf.reshape(_input, shape=[-1, nb_elements._value])
-        self.d0 = self.dense_layer(self.flat, 256, 'dense0')
-        self.d1 = self.dense_layer(self.d0, 256, 'dense1')
-
+        self.d1 = self.ff_fc(_input,self.is_training)
+  
         #LSTM Layer 
         if Config.USE_RNN:     
             D = Config.NCELLS
@@ -100,6 +110,7 @@ class NetworkVP:
             #self.batch_size = tf.shape(self.step_sizes)[0]    
             self.batch_size = tf.placeholder(tf.int32, name='batchsize')
             d1 = tf.reshape(self.d1, [self.batch_size,-1,D])
+
             
             self.c0 = tf.placeholder(tf.float32, [None, D])
             self.h0 = tf.placeholder(tf.float32, [None, D])
@@ -114,6 +125,8 @@ class NetworkVP:
          
         else:
             self._state = self.d1
+            
+        self._state = tf.nn.dropout(self._state, 0.5) #is effective!
 
         self.logits_v = tf.squeeze(self.dense_layer(self._state, 1, 'logits_v', func=None), squeeze_dims=[1])
         self.cost_v = 0.5 * tf.reduce_sum(tf.square(self.y_r - self.logits_v), reduction_indices=0)
@@ -184,6 +197,11 @@ class NetworkVP:
                 self.train_op = [self.train_op_p, self.train_op_v]
             else:
                 self.train_op = self.opt.minimize(self.cost_all, global_step=self.global_step)
+                
+                
+        #TODO : add various auxiliary tasks when is_training = True
+        
+        #1. Inverse Dynamics (predict previous actions given 2 consecutive states, or lstm features...)
 
 
     def _create_tensor_board(self):
@@ -238,9 +256,17 @@ class NetworkVP:
                 output = func(output)
 
         return output
+    
+    
+    def batch_norm_layer(self,x,training_phase,scope_bn,activation=None):
+        return tf.cond(training_phase, 
+		lambda: tf.contrib.layers.batch_norm(x, activation_fn=activation, center=True, scale=True,
+		updates_collections=None,is_training=True, reuse=None,scope=scope_bn,decay=0.9, epsilon=1e-5),
+		lambda: tf.contrib.layers.batch_norm(x, activation_fn =activation, center=True, scale=True,
+		updates_collections=None,is_training=False, reuse=True,scope=scope_bn,decay=0.9, epsilon=1e-5))
 
     def __get_base_feed_dict(self):
-        return {self.var_beta: self.beta, self.var_learning_rate: self.learning_rate}
+        return {self.var_beta: self.beta, self.var_learning_rate: self.learning_rate, self.is_training: Config.TRAIN_MODELS}
 
     def get_global_step(self):
         step = self.sess.run(self.global_step)
@@ -261,26 +287,27 @@ class NetworkVP:
     def predict_p_and_v(self, x, c, h):
         feed_dict = self.__get_base_feed_dict()
         if Config.USE_RNN == False:     
-            feed_dict.update({self.x: x})
+            feed_dict.update({self.x: x, self.is_training: False})
             p, v = self.sess.run([self.softmax_p, self.logits_v], feed_dict=feed_dict)
             return p, v, c, h
         else:
             step_sizes = np.ones((c.shape[0],),dtype=np.int32)       
             feed_dict = self.__get_base_feed_dict()
-            feed_dict.update({self.x: x, self.step_sizes:step_sizes, self.c0:c, self.h0:h, self.batch_size:step_sizes.shape[0]})        
+            feed_dict.update({self.x: x, self.step_sizes:step_sizes, self.c0:c, self.h0:h, self.batch_size:step_sizes.shape[0], self.is_training: False})        
             p, v, rnn_state = self.sess.run([self.softmax_p, self.logits_v, self.lstm_state], feed_dict=feed_dict)       
             return p, v, rnn_state.c, rnn_state.h
     
     def train(self, x, y_r, a, c, h, l):
-        
+        # TODO : define a new OP which dynamically pad tensor
+        # https://www.tensorflow.org/extend/adding_an_op
         r = np.reshape(y_r,(y_r.shape[0],))
         feed_dict = self.__get_base_feed_dict()
         
         if Config.USE_RNN == False:        
-            feed_dict.update({self.x: x, self.y_r: r, self.action_index: a})
+            feed_dict.update({self.x: x, self.y_r: r, self.action_index: a, self.is_training: True})
         else:
             step_sizes = np.array(l)
-            feed_dict.update({self.x: x, self.y_r: r, self.action_index: a, self.step_sizes:step_sizes, self.c0:c, self.h0:h, self.batch_size:len(l)})
+            feed_dict.update({self.x: x, self.y_r: r, self.action_index: a, self.step_sizes:step_sizes, self.c0:c, self.h0:h, self.batch_size:len(l), self.is_training: True})
         self.sess.run(self.train_op, feed_dict=feed_dict)
 
     def log(self, x, y_r, a):

@@ -33,11 +33,11 @@ class Config:
     ATARI_GAME = 'CartPole-v0'
 
     # Enable to see the trained agent in action
-    PLAY_MODE = False
+    PLAY_MODE = True
     # Enable to train
-    TRAIN_MODELS = True
+    TRAIN_MODELS = False
     # Load old models. Throws if the model doesn't exist
-    LOAD_CHECKPOINT = False
+    LOAD_CHECKPOINT = True
     # If 0, the latest checkpoint is loaded
     LOAD_EPISODE = 0 
 
@@ -46,14 +46,14 @@ class Config:
     
     # If the dynamic configuration is on, these are the initial values.
     # Number of Agents
-    AGENTS = 16
+    AGENTS = 32
     # Number of Predictors
     PREDICTORS = 2
     # Number of Trainers
     TRAINERS = 2
 
     # Device
-    DEVICE = 'cpu:0'
+    DEVICE = 'gpu:0'
 
     # Enable the dynamic adjustment (+ waiting time to start it)
     DYNAMIC_SETTINGS = True
@@ -70,18 +70,18 @@ class Config:
     DISCOUNT = 0.99
     
     # Tmax
-    TIME_MAX = 5
+    TIME_MAX = 10
     
     # Reward Clipping
     REWARD_MIN = -1
     REWARD_MAX = 1
 
     # Max size of the queue
-    MAX_QUEUE_SIZE = 100
+    MAX_QUEUE_SIZE = 1000
     PREDICTION_BATCH_SIZE = 128
 
     # Input of the DNN
-    STACKED_FRAMES = 1
+    STACKED_FRAMES = 4
     IMAGE_WIDTH = 1
     IMAGE_HEIGHT = 4
     
@@ -137,7 +137,7 @@ class Config:
     # Print stats every PRINT_STATS_FREQUENCY episodes
     PRINT_STATS_FREQUENCY = 1
     # The window to average stats
-    STAT_ROLLING_MEAN_WINDOW = 1000
+    STAT_ROLLING_MEAN_WINDOW = 100
 
     # Results filename
     RESULTS_FILENAME = 'results.txt'
