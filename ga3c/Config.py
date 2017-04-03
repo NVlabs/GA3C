@@ -30,14 +30,14 @@ class Config:
     # Game configuration
 
     # Name of the game, with version (e.g. PongDeterministic-v0)
-    ATARI_GAME = 'CartPole-v0'
+    ATARI_GAME = 'Pong-v0'
 
     # Enable to see the trained agent in action
-    PLAY_MODE = True
+    PLAY_MODE = False
     # Enable to train
-    TRAIN_MODELS = False
+    TRAIN_MODELS = True
     # Load old models. Throws if the model doesn't exist
-    LOAD_CHECKPOINT = True
+    LOAD_CHECKPOINT = False
     # If 0, the latest checkpoint is loaded
     LOAD_EPISODE = 0 
 
@@ -46,14 +46,14 @@ class Config:
     
     # If the dynamic configuration is on, these are the initial values.
     # Number of Agents
-    AGENTS = 32
+    AGENTS = 8
     # Number of Predictors
     PREDICTORS = 2
     # Number of Trainers
     TRAINERS = 2
 
     # Device
-    DEVICE = 'gpu:0'
+    DEVICE = 'cpu:0'
 
     # Enable the dynamic adjustment (+ waiting time to start it)
     DYNAMIC_SETTINGS = True
@@ -82,8 +82,8 @@ class Config:
 
     # Input of the DNN
     STACKED_FRAMES = 4
-    IMAGE_WIDTH = 1
-    IMAGE_HEIGHT = 4
+    IMAGE_WIDTH = 80
+    IMAGE_HEIGHT = 80
     
 
     # Total number of episodes and annealing frequency
@@ -112,7 +112,7 @@ class Config:
     # Epsilon (regularize policy lag in GA3C)
     LOG_EPSILON = 1e-6
     # Training min batch size - increasing the batch size increases the stability of the algorithm, but make learning slower
-    TRAINING_MIN_BATCH_SIZE = 16
+    TRAINING_MIN_BATCH_SIZE = 00
     
     # Generalized Advantage Estimation
     USE_GAE = False

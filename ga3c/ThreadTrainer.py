@@ -50,8 +50,34 @@ class ThreadTrainer(Thread):
             at = np.zeros((Config.TIME_MAX, a_.shape[1]),dtype=np.float32)
             xt[:t] = x_; rt[:t] = r_; at[:t] = a_
             x_ = xt; r_ = rt; a_ = at;
-        return x_, r_, a_, t
-    
+        return x_, r_, a_, t 
+                    
+    def run(self):
+        while not self.exit_flag:
+            batch_size = 0
+            lengths = []
+            while batch_size <= Config.TRAINING_MIN_BATCH_SIZE:
+                idx, x_, r_, a_, c_, h_ = self.server.training_q.get()
+                
+                x_,r_,a_,t = ThreadTrainer._dynamic_pad(x_,r_,a_)
+                lengths.append(t)
+                
+                if batch_size == 0:
+                    x__ = x_; r__ = r_; a__ = a_; c__ = c_; h__ = h_; 
+                else:
+                    #x__, r__, a__, c__, h__ = ThreadTrainer._concat((x__, r__, a__, c__, h__),(x_, r_, a_, c_, h_))
+                    x__ = np.concatenate((x__, x_))
+                    r__ = np.concatenate((r__, r_))
+                    a__ = np.concatenate((a__, a_))
+                    c__ = np.concatenate((c__, c_))
+                    h__ = np.concatenate((h__, h_))
+                
+                batch_size += x_.shape[0] #we change meaning of batch
+            
+            if Config.TRAIN_MODELS:
+                self.server.train_model(x__, r__, a__,c__,h__, lengths) 
+
+
     @staticmethod
     def _concat(exp1,exp2):
         x1,r1,a1,c1,h1 = exp1
@@ -107,30 +133,4 @@ class ThreadTrainer(Thread):
                 x, r, a, c, h, l = self.get_batch_replay()              
                 if Config.TRAIN_MODELS:
                     self.server.train_model_off(x, r, a, c, h, l) 
-                  
-                    
-    def run(self):
-        while not self.exit_flag:
-            batch_size = 0
-            lengths = []
-            while batch_size <= Config.TRAINING_MIN_BATCH_SIZE:
-                idx, x_, r_, a_, c_, h_ = self.server.training_q.get()
-                
-                x_,r_,a_,t = ThreadTrainer._dynamic_pad(x_,r_,a_)
-                lengths.append(t)
-                
-                if batch_size == 0:
-                    x__ = x_; r__ = r_; a__ = a_; c__ = c_; h__ = h_; 
-                else:
-                    #x__, r__, a__, c__, h__ = ThreadTrainer._concat((x__, r__, a__, c__, h__),(x_, r_, a_, c_, h_))
-                    x__ = np.concatenate((x__, x_))
-                    r__ = np.concatenate((r__, r_))
-                    a__ = np.concatenate((a__, a_))
-                    c__ = np.concatenate((c__, c_))
-                    h__ = np.concatenate((h__, h_))
-                
-                batch_size += x_.shape[0] #we change meaning of batch
-            
-            #print(lengths_real)
-            if Config.TRAIN_MODELS:
-                self.server.train_model(x__, r__, a__,c__,h__, lengths) 
+                 
