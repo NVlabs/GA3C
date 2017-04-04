@@ -46,7 +46,7 @@ class Config:
     
     # If the dynamic configuration is on, these are the initial values.
     # Number of Agents
-    AGENTS = 32 
+    AGENTS = 14
     # Number of Predictors
     PREDICTORS = 2
     # Number of Trainers
@@ -59,6 +59,9 @@ class Config:
     DYNAMIC_SETTINGS = True
     DYNAMIC_SETTINGS_STEP_WAIT = 20
     DYNAMIC_SETTINGS_INITIAL_WAIT = 10
+    
+    ##
+    LIB = 'TF'
 
     #########################################################################
     # Algorithm parameters
@@ -74,13 +77,14 @@ class Config:
     REWARD_MAX = 1
 
     # Max size of the queue
-    MAX_QUEUE_SIZE = 100
+    MAX_QUEUE_SIZE = 1000
     PREDICTION_BATCH_SIZE = 128
 
     # Input of the DNN
     STACKED_FRAMES = 4
-    IMAGE_WIDTH = 84
-    IMAGE_HEIGHT = 84
+    IMAGE_WIDTH = 80
+    IMAGE_HEIGHT = 80
+    
 
     # Total number of episodes and annealing frequency
     EPISODES = 400000
@@ -88,11 +92,11 @@ class Config:
 
     # Entropy regualrization hyper-parameter
     BETA_START = 0.01
-    BETA_END = 0.01
+    BETA_END = 0.001
 
     # Learning rate
-    LEARNING_RATE_START = 0.0003
-    LEARNING_RATE_END = 0.0003
+    LEARNING_RATE_START = 0.001
+    LEARNING_RATE_END = 0.0001
 
     # RMSProp parameters
     RMSPROP_DECAY = 0.99
@@ -108,7 +112,14 @@ class Config:
     # Epsilon (regularize policy lag in GA3C)
     LOG_EPSILON = 1e-6
     # Training min batch size - increasing the batch size increases the stability of the algorithm, but make learning slower
-    TRAINING_MIN_BATCH_SIZE = 00
+    TRAINING_MIN_BATCH_SIZE = 8
+    
+    # Generalized Advantage Estimation
+    USE_GAE = False
+    
+    # USE RNN - can help to converge but current version is much slower than FF
+    USE_RNN = True
+    NCELLS = 256
     
     #########################################################################
     # Log and save
@@ -126,7 +137,7 @@ class Config:
     # Print stats every PRINT_STATS_FREQUENCY episodes
     PRINT_STATS_FREQUENCY = 1
     # The window to average stats
-    STAT_ROLLING_MEAN_WINDOW = 1000
+    STAT_ROLLING_MEAN_WINDOW = 100
 
     # Results filename
     RESULTS_FILENAME = 'results.txt'
@@ -139,4 +150,4 @@ class Config:
     # Minimum policy
     MIN_POLICY = 0.0
     # Use log_softmax() instead of log(softmax())
-    USE_LOG_SOFTMAX = False
+    USE_LOG_SOFTMAX = True

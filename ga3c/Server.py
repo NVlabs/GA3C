@@ -30,12 +30,18 @@ import time
 
 from Config import Config
 from Environment import Environment
-from NetworkVP import NetworkVP
 from ProcessAgent import ProcessAgent
 from ProcessStats import ProcessStats
 from ThreadDynamicAdjustment import ThreadDynamicAdjustment
 from ThreadPredictor import ThreadPredictor
 from ThreadTrainer import ThreadTrainer
+
+if Config.LIB == 'TF':
+    from NetworkVP import NetworkVP
+elif Config.LIB == 'Torch':
+    from NetworkVP_torch import NetworkVP
+elif Config.LIB == 'Chainer':
+    from NetworkVP_chainer import NetworkVP
 
 
 class Server:
@@ -85,8 +91,8 @@ class Server:
         self.trainers[-1].join()
         self.trainers.pop()
 
-    def train_model(self, x_, r_, a_, trainer_id):
-        self.model.train(x_, r_, a_, trainer_id)
+    def train_model(self, x_, r_, a_, c, h, m):
+        self.model.train(x_, r_, a_, c, h, m)
         self.training_step += 1
         self.frame_counter += x_.shape[0]
 
