@@ -105,7 +105,7 @@ class NetworkVP:
         self.action_index = tf.placeholder(tf.float32, [None, self.num_actions])
         
         _input = self.x
-        self.d1 = self.ff_cnn(_input,self.is_training)
+        self.d1 = self.ff_cnn(_input,self.is_training) 
   
         #LSTM Layer 
         if Config.USE_RNN:     
