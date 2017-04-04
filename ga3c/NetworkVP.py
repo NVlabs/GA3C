@@ -66,7 +66,7 @@ class NetworkVP:
                     vars = tf.global_variables()
                     self.saver = tf.train.Saver({var.name: var for var in vars}, max_to_keep=0)
 
-    def ff_fc(self,_input, is_training=False):
+    def ff_fc(self, _input, is_training=False):
         flatten_input_shape = _input.get_shape()
         nb_elements = flatten_input_shape[1] * flatten_input_shape[2] * flatten_input_shape[3]
 
@@ -76,10 +76,15 @@ class NetworkVP:
         d1 = self.dense_layer(d0, 256, 'dense1')
         return d1
     
-    def ff_cnn(self,_input):
+    def ff_cnn(self, _input, is_training=False):
         n1 = self.conv2d_layer(_input, 8, 32, 'conv11', strides=[1, 4, 4, 1])
         n2 = self.conv2d_layer(n1, 4, 64, 'conv12', strides=[1, 2, 2, 1]) 
-        return n2
+        
+        flatten_input_shape = n2.get_shape()
+        nb_elements = flatten_input_shape[1] * flatten_input_shape[2] * flatten_input_shape[3]
+        flat = tf.reshape(n2, shape=[-1, nb_elements._value])
+        d0 = self.dense_layer(flat, 256, 'dense0')
+        return d0
     
     def switch_compute(self,_input,do_compute):
         return Exception('blah')
@@ -100,7 +105,7 @@ class NetworkVP:
         self.action_index = tf.placeholder(tf.float32, [None, self.num_actions])
         
         _input = self.x
-        self.d1 = self.ff_fc(_input,self.is_training)
+        self.d1 = self.ff_cnn(_input,self.is_training)
   
         #LSTM Layer 
         if Config.USE_RNN:     
