@@ -66,28 +66,16 @@ class NetworkVP:
                     vars = tf.global_variables()
                     self.saver = tf.train.Saver({var.name: var for var in vars}, max_to_keep=0)
 
-    def ff_fc(self, _input, is_training=False):
-        flatten_input_shape = _input.get_shape()
-        nb_elements = flatten_input_shape[1] * flatten_input_shape[2] * flatten_input_shape[3]
-
-        flat = tf.reshape(_input, shape=[-1, nb_elements._value])
-        d0 = self.dense_layer(flat, 256, 'dense0')
-        #d0 = self.batch_norm_layer(d0, is_training, scope_bn='target_batch_norm_0', activation=tf.nn.relu)
-        d1 = self.dense_layer(d0, 256, 'dense1')
-        return d1
     
     def ff_cnn(self, _input, is_training=False):
-        n1 = self.conv2d_layer(_input, 8, 32, 'conv11', strides=[1, 4, 4, 1])
-        n2 = self.conv2d_layer(n1, 4, 64, 'conv12', strides=[1, 2, 2, 1]) 
+        n1 = self.conv2d_bn_layer(_input, 8, 32, 'conv11', strides=[1, 4, 4, 1], is_training=is_training)    
+        n2 = self.conv2d_bn_layer(n1, 4, 64, 'conv12', strides=[1, 2, 2, 1], is_training=is_training) 
         
         flatten_input_shape = n2.get_shape()
         nb_elements = flatten_input_shape[1] * flatten_input_shape[2] * flatten_input_shape[3]
         flat = tf.reshape(n2, shape=[-1, nb_elements._value])
         d0 = self.dense_layer(flat, 256, 'dense0')
         return d0
-    
-    def switch_compute(self,_input,do_compute):
-        return Exception('blah')
               
 
     def _create_graph(self):
@@ -131,7 +119,7 @@ class NetworkVP:
         else:
             self._state = self.d1
             
-        self._state = tf.nn.dropout(self._state, 0.5) #is effective!
+        #self._state = tf.nn.dropout(self._state, 0.5) #is effective!
 
         self.logits_v = tf.squeeze(self.dense_layer(self._state, 1, 'logits_v', func=None), squeeze_dims=[1])
         self.cost_v = 0.5 * tf.reduce_sum(tf.square(self.y_r - self.logits_v), reduction_indices=0)
@@ -243,6 +231,11 @@ class NetworkVP:
                 output = func(output)
 
         return output
+        
+    def conv2d_bn_layer(self, input,filter_size, out_dim, name, strides, func=tf.nn.relu, is_training=False):
+        n1 = self.conv2d_layer(input,filter_size,out_dim, name, strides, func=None)
+        n2 = self.batch_norm_layer(n1,is_training,scope_bn=name+'_bn',activation=func)
+        return n2
 
     def conv2d_layer(self, input, filter_size, out_dim, name, strides, func=tf.nn.relu):
         in_dim = input.get_shape().as_list()[-1]
@@ -343,3 +336,8 @@ class NetworkVP:
 
     def get_variable_value(self, name):
         return self.sess.run(self.graph.get_tensor_by_name(name))
+        
+        
+        
+    #pixel control, was stolen from myosuda "unreal" implementatino
+    #https://github.com/miyosuda/unreal/blob/master/model/model.py

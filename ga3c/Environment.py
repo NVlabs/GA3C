@@ -36,7 +36,6 @@ import scipy.misc as misc
 from Config import Config
 from GameManager import GameManager
 
-
 class Environment:
     def __init__(self):
         self.game = GameManager(Config.ATARI_GAME, display=Config.PLAY_MODE)
