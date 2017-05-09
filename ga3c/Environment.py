@@ -36,6 +36,7 @@ import scipy.misc as misc
 from Config import Config
 from GameManager import GameManager
 
+
 class Environment:
     def __init__(self):
         self.game = GameManager(Config.ATARI_GAME, display=Config.PLAY_MODE)
@@ -46,15 +47,6 @@ class Environment:
         self.total_reward = 0
 
         self.reset()
-        
-    @staticmethod
-    def preprocess_karpathy_pong(image):      
-          im = image[35:195] # crop
-          im = im[::2,::2,0] # downsample by factor of 2
-          im[im == 144] = 0 # erase background (background type 1)
-          im[im == 109] = 0 # erase background (background type 2) 
-          im[im != 0] = 1 # everything else (paddles, ball) just set to 1
-          return im.astype(np.float32)
 
     @staticmethod
     def _rgb2gray(rgb):
@@ -77,10 +69,7 @@ class Environment:
     def _update_frame_q(self, frame):
         if self.frame_q.full():
             self.frame_q.get()
-        image = Environment.preprocess_karpathy_pong(frame)
-        
-        #image = Environment._preprocess(frame)
-        #image = frame[:,np.newaxis].astype(np.float32)
+        image = Environment._preprocess(frame)
         self.frame_q.put(image)
 
     def get_num_actions(self):

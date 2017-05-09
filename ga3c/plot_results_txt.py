@@ -67,11 +67,9 @@ def main():
     
     fig, axarr = plt.subplots(1, sharex=True, figsize=(8, 8))
     
-    scores1 = 'results_ff.txt'
     scores2 = 'results.txt'
 
-    addplot(scores1, axarr,tableau20[0],'batch16.ff')
-    addplot(scores2, axarr,tableau20[4],'batch16.lstm')
+    addplot(scores2, axarr,tableau20[4],'batch.lstm')
 
     plt.xlabel('hours')
     plt.ylabel('CartPole-V0.score')
