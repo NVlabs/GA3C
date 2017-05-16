@@ -66,7 +66,6 @@ class ProcessAgent(Process):
         x_ = np.array([exp.state for exp in experiences])
         a_ = np.eye(self.num_actions)[np.array([exp.action for exp in experiences])].astype(np.float32)
         r_ = np.array([exp.reward for exp in experiences])
-        r_ = r_.reshape(r_.shape[0],1)
         return x_, r_, a_
 
     def predict(self, state):
@@ -90,7 +89,6 @@ class ProcessAgent(Process):
 
         time_count = 0
         reward_sum = 0.0
-        total_reward = 0.0
         
      
         rnn = {'c':np.zeros((1,Config.NCELLS),dtype=np.float32),
@@ -115,7 +113,6 @@ class ProcessAgent(Process):
             prediction, value, rnn['c'][0], rnn['h'][0] = self.predict(state)
                                   
             action = self.select_action(prediction)
-
             reward, done = self.env.step(action)
             reward_sum += reward
             exp = Experience(self.env.previous_state, action, prediction, reward, done)
@@ -125,13 +122,9 @@ class ProcessAgent(Process):
                 terminal_reward = 0 if done else value
 
                 updated_exps = ProcessAgent._accumulate_rewards(experiences, self.discount_factor, terminal_reward)
-                if len(updated_exps) == 0:
-                    yield None, None, None, total_reward
-                else:
-                    x_, r_, a_ = self.convert_data(updated_exps)
-                    yield x_, r_, a_, reward_sum, init_rnn['c'], init_rnn['h']
+                x_, r_, a_ = self.convert_data(updated_exps)
+                yield x_, r_, a_, reward_sum, init_rnn['c'], init_rnn['h']
 
-                #reset init_rnn
                 init_rnn['c'] = rnn['c']
                 init_rnn['h'] = rnn['h']
                 # reset the tmax count
@@ -152,8 +145,6 @@ class ProcessAgent(Process):
             total_length = 0
             for x_, r_, a_, reward_sum, c0, h0 in self.run_episode():
                 total_reward += reward_sum
-                if x_ is None:
-                    break
                 total_length += len(r_) + 1  # +1 for last frame that we drop
                 self.training_q.put((self.id, x_, r_, a_, c0, h0))
             self.episode_log_q.put((datetime.now(), total_reward, total_length))

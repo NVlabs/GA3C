@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import gym
-import time
+
 
 class GameManager:
     def __init__(self, game_name, display):
@@ -47,4 +47,3 @@ class GameManager:
     def _update_display(self):
         if self.display:
             self.env.render()
-            time.sleep(0.03)

@@ -50,7 +50,7 @@ class NetworkVP:
 
         self.graph = tf.Graph()
         with self.graph.as_default() as g:
-            with tf.device(self.device), tf.variable_scope('net_') as self.scope:
+            with tf.device(self.device):
                 self._create_graph()
 
                 self.sess = tf.Session(
@@ -65,33 +65,11 @@ class NetworkVP:
                 if Config.LOAD_CHECKPOINT or Config.SAVE_MODELS:
                     vars = tf.global_variables()
                     self.saver = tf.train.Saver({var.name: var for var in vars}, max_to_keep=0)
-
-    def ff_fc(self, _input, is_training=False):
-        flatten_input_shape = _input.get_shape()
-        nb_elements = flatten_input_shape[1] * flatten_input_shape[2] * flatten_input_shape[3]
-
-        flat = tf.reshape(_input, shape=[-1, nb_elements._value])
-        d0 = self.dense_layer(flat, 256, 'dense0')
-        #d0 = self.batch_norm_layer(d0, is_training, scope_bn='target_batch_norm_0', activation=tf.nn.relu)
-        d1 = self.dense_layer(d0, 256, 'dense1')
-        return d1
-    
-    def ff_cnn(self, _input, is_training=False):
-        n1 = self.conv2d_layer(_input, 8, 32, 'conv11', strides=[1, 4, 4, 1])
-        n2 = self.conv2d_layer(n1, 4, 64, 'conv12', strides=[1, 2, 2, 1]) 
-        
-        flatten_input_shape = n2.get_shape()
-        nb_elements = flatten_input_shape[1] * flatten_input_shape[2] * flatten_input_shape[3]
-        flat = tf.reshape(n2, shape=[-1, nb_elements._value])
-        d0 = self.dense_layer(flat, 256, 'dense0')
-        return d0
-    
-    def switch_compute(self,_input,do_compute):
-        return Exception('blah')
-              
+                
 
     def _create_graph(self):
-        self.x = tf.placeholder(tf.float32, [None, self.img_height, self.img_width, self.img_channels], name='X')
+        self.x = tf.placeholder(
+            tf.float32, [None, self.img_height, self.img_width, self.img_channels], name='X')
         self.y_r = tf.placeholder(tf.float32, [None], name='Yr')
 
         self.var_beta = tf.placeholder(tf.float32, name='beta', shape=[])
@@ -101,13 +79,19 @@ class NetworkVP:
         
         self.is_training = tf.placeholder(tf.bool)
 
-
+        # As implemented in A3C paper
+        self.n1 = self.conv2d_layer(self.x, 8, 16, 'conv11', strides=[1, 4, 4, 1])
+        self.n2 = self.conv2d_layer(self.n1, 4, 32, 'conv12', strides=[1, 2, 2, 1])
         self.action_index = tf.placeholder(tf.float32, [None, self.num_actions])
-        
-        _input = self.x
-        self.d1 = self.ff_cnn(_input,self.is_training) 
-  
-        #LSTM Layer 
+        _input = self.n2
+
+        flatten_input_shape = _input.get_shape()
+        nb_elements = flatten_input_shape[1] * flatten_input_shape[2] * flatten_input_shape[3]
+
+        self.flat = tf.reshape(_input, shape=[-1, nb_elements._value])
+        self.d1 = self.dense_layer(self.flat, 256, 'dense1')
+
+	#LSTM Layer 
         if Config.USE_RNN:     
             D = Config.NCELLS
             self.lstm = rnn.BasicLSTMCell(D, state_is_tuple=True)
@@ -126,37 +110,40 @@ class NetworkVP:
                                                         sequence_length = self.step_sizes,
                                                         time_major = False) 
                                                         #scope=scope)                                 
-            self._state = tf.reshape(lstm_outputs, [-1,D])   + self.d1  #just in case, avoid vanishing gradient
-         
+            self._state = tf.reshape(lstm_outputs, [-1,D]) #just in case, avoid vanishing gradient
+            
         else:
             self._state = self.d1
-            
-        self._state = tf.nn.dropout(self._state, 0.5) #is effective!
 
-        self.logits_v = tf.squeeze(self.dense_layer(self._state, 1, 'logits_v', func=None), squeeze_dims=[1])
-        self.cost_v = 0.5 * tf.reduce_sum(tf.square(self.y_r - self.logits_v), reduction_indices=0)
+        self.logits_v = tf.squeeze(self.dense_layer(self._state, 1, 'logits_v', func=None), axis=[1])
+        self.cost_v = 0.5 * tf.reduce_sum(tf.square(self.y_r - self.logits_v), axis=0)
 
-        self.logits_p = self.dense_layer(self._state, self.num_actions, 'logits_p')
+        self.logits_p = self.dense_layer(self._state, self.num_actions, 'logits_p', func=None)
         if Config.USE_LOG_SOFTMAX:
             self.softmax_p = tf.nn.softmax(self.logits_p)
             self.log_softmax_p = tf.nn.log_softmax(self.logits_p)
-            self.log_selected_action_prob = tf.reduce_sum(self.log_softmax_p * self.action_index, reduction_indices=1)
+            self.log_selected_action_prob = tf.reduce_sum(self.log_softmax_p * self.action_index, axis=1)
 
             self.cost_p_1 = self.log_selected_action_prob * (self.y_r - tf.stop_gradient(self.logits_v))
             self.cost_p_2 = -1 * self.var_beta * \
-                        tf.reduce_sum(self.log_softmax_p * self.softmax_p, reduction_indices=1)
+                        tf.reduce_sum(self.log_softmax_p * self.softmax_p, axis=1)
         else:
             self.softmax_p = (tf.nn.softmax(self.logits_p) + Config.MIN_POLICY) / (1.0 + Config.MIN_POLICY * self.num_actions)
-            self.selected_action_prob = tf.reduce_sum(self.softmax_p * self.action_index, reduction_indices=1)
+            self.selected_action_prob = tf.reduce_sum(self.softmax_p * self.action_index, axis=1)
 
             self.cost_p_1 = tf.log(tf.maximum(self.selected_action_prob, self.log_epsilon)) \
                         * (self.y_r - tf.stop_gradient(self.logits_v))
             self.cost_p_2 = -1 * self.var_beta * \
                         tf.reduce_sum(tf.log(tf.maximum(self.softmax_p, self.log_epsilon)) *
-                                      self.softmax_p, reduction_indices=1)
-        
-        self.cost_p_1_agg = tf.reduce_sum(self.cost_p_1, reduction_indices=0)
-        self.cost_p_2_agg = tf.reduce_sum(self.cost_p_2, reduction_indices=0)
+                                      self.softmax_p, axis=1)
+        if Config.USE_RNN:
+            mask = tf.reduce_max(self.action_index,axis=1)
+            self.cost_v = 0.5 * tf.reduce_sum(tf.square(self.y_r - self.logits_v) * mask, axis=0)
+            self.cost_p_1_agg = tf.reduce_sum(self.cost_p_1 * mask, axis=0)
+            self.cost_p_2_agg = tf.reduce_sum(self.cost_p_2 * mask, axis=0)
+        else:
+            self.cost_p_1_agg = tf.reduce_sum(self.cost_p_1, axis=0)
+            self.cost_p_2_agg = tf.reduce_sum(self.cost_p_2, axis=0)
         self.cost_p = -(self.cost_p_1_agg + self.cost_p_2_agg)
         
         if Config.DUAL_RMSPROP:
@@ -202,11 +189,6 @@ class NetworkVP:
                 self.train_op = [self.train_op_p, self.train_op_v]
             else:
                 self.train_op = self.opt.minimize(self.cost_all, global_step=self.global_step)
-                
-                
-        #TODO : add various auxiliary tasks when is_training = True
-        
-        #1. Inverse Dynamics (predict previous actions given 2 consecutive states, or lstm features...)
 
 
     def _create_tensor_board(self):
@@ -261,14 +243,6 @@ class NetworkVP:
                 output = func(output)
 
         return output
-    
-    
-    def batch_norm_layer(self,x,training_phase,scope_bn,activation=None):
-        return tf.cond(training_phase, 
-		lambda: tf.contrib.layers.batch_norm(x, activation_fn=activation, center=True, scale=True,
-		updates_collections=None,is_training=True, reuse=None,scope=scope_bn,decay=0.9, epsilon=1e-5),
-		lambda: tf.contrib.layers.batch_norm(x, activation_fn =activation, center=True, scale=True,
-		updates_collections=None,is_training=False, reuse=True,scope=scope_bn,decay=0.9, epsilon=1e-5))
 
     def __get_base_feed_dict(self):
         return {self.var_beta: self.beta, self.var_learning_rate: self.learning_rate, self.is_training: Config.TRAIN_MODELS}

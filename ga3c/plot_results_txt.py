@@ -20,6 +20,8 @@ tableau20 = [(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 120),
 for i in range(len(tableau20)):  
     r, g, b = tableau20[i]  
     tableau20[i] = (r / 255., g / 255., b / 255.)  
+    
+MAX_EPISODES = 6000
 
 def prepare_time_axis(hour):
     time = []
@@ -28,7 +30,7 @@ def prepare_time_axis(hour):
     tprev = t0
     total_time = 0
     dt = 0
-    for h in hour:
+    for h in hour[:MAX_EPISODES]:
         sh = h.split(' ')[1].split(':')  
         tt = int(sh[0]) + float(sh[1])/60.0 + float(sh[2])/3600.0
         if tt < tprev: 
@@ -48,7 +50,7 @@ def prepare_time_axis(hour):
 def addplot(filename,ax,color,label):
     scores = pd.read_csv(filename, delimiter=', ')
     hour = scores['date']
-    reward = scores['reward']  
+    reward = scores['reward'][:MAX_EPISODES]
     time = prepare_time_axis(hour)
 
     mean_window = 100
@@ -59,6 +61,7 @@ def addplot(filename,ax,color,label):
     ax.plot(time, r, color=color,label=label)
     ax.fill_between(time, r-r_std, r+r_std, color=color, alpha=0.2, linewidth=0)
     
+import os, glob, re
 
 def main():
     parser = argparse.ArgumentParser()
@@ -66,19 +69,31 @@ def main():
     args = parser.parse_args()
     
     fig, axarr = plt.subplots(1, sharex=True, figsize=(8, 8))
+
+    results = glob.glob('results_*.txt')
     
+    for i in range(len(results)):
+        file = results[i]
+        name = re.split( 'results_' , os.path.splitext(file)[0])[1]
+        print(name)
+        addplot(file, axarr, tableau20[i%20],name)
+    
+<<<<<<< HEAD
     scores = 'results.txt'
 
     addplot(scores, axarr,tableau20[4],'batch16.lstm')
+=======
+
+>>>>>>> e2892b5e0bf30befe4a16b217cab98073708c66b
 
     plt.xlabel('hours')
-    plt.ylabel('CartPole-V0.score')
+    plt.ylabel('PongDeterministic-V0.score')
     plt.legend(loc='best')
     fig_fname = args.scores + '.png'
     plt.savefig(fig_fname)
     plt.show()
     plt.pause(1)
-    
+   
 
 if __name__ == '__main__':
     main()
