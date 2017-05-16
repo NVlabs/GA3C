@@ -66,6 +66,7 @@ class ProcessAgent(Process):
         x_ = np.array([exp.state for exp in experiences])
         a_ = np.eye(self.num_actions)[np.array([exp.action for exp in experiences])].astype(np.float32)
         r_ = np.array([exp.reward for exp in experiences])
+        #r_ = r_.reshape(r_.shape[0],1)
         return x_, r_, a_
 
     def predict(self, state):
@@ -125,8 +126,8 @@ class ProcessAgent(Process):
                 x_, r_, a_ = self.convert_data(updated_exps)
                 yield x_, r_, a_, reward_sum, init_rnn['c'], init_rnn['h']
 
-                init_rnn['c'] = rnn['c']
-                init_rnn['h'] = rnn['h']
+                init_rnn['c'] = rnn['c'].copy()
+                init_rnn['h'] = rnn['h'].copy()
                 # reset the tmax count
                 time_count = 0
                 # keep the last experience for the next batch
