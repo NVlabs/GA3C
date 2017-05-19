@@ -24,13 +24,24 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import gym
+
+#register your own environment
+gym.envs.register(
+    id='PongDeterministic-v100',
+    entry_point='gym.envs.atari:AtariEnv',
+    reward_threshold=21.0,
+    kwargs={'game':'pong', 'obs_type':  'image', 'frameskip':4, 'repeat_action_probability': 0.25},
+    nondeterministic=False
+)
+
 class Config:
 
     #########################################################################
     # Game configuration
 
     # Name of the game, with version (e.g. PongDeterministic-v0)
-    ATARI_GAME = 'PongDeterministic-v0'
+    ATARI_GAME = 'PongDeterministic-v100'
 
     # Enable to see the trained agent in action
     PLAY_MODE = False
@@ -67,24 +78,24 @@ class Config:
     DISCOUNT = 0.99
     
     # Tmax
-    TIME_MAX = 5
+    TIME_MAX = 20
     
     # Reward Clipping
     REWARD_MIN = -1
     REWARD_MAX = 1
 
     # Max size of the queue
-    MAX_QUEUE_SIZE = 100
+    MAX_QUEUE_SIZE = 20
     PREDICTION_BATCH_SIZE = 128
 
     # Input of the DNN
-    STACKED_FRAMES = 4
+    STACKED_FRAMES = 1
     IMAGE_WIDTH = 84
     IMAGE_HEIGHT = 84
 
     # Total number of episodes and annealing frequency
-    EPISODES = 400000
-    ANNEALING_EPISODE_COUNT = 400000
+    EPISODES = 4000
+    ANNEALING_EPISODE_COUNT = 4000
 
     # Entropy regualrization hyper-parameter
     BETA_START = 0.01
@@ -103,12 +114,12 @@ class Config:
     DUAL_RMSPROP = False
     
     # Gradient clipping
-    USE_GRAD_CLIP = False
+    USE_GRAD_CLIP = True
     GRAD_CLIP_NORM = 40.0 
     # Epsilon (regularize policy lag in GA3C)
     LOG_EPSILON = 1e-6
     # Training min batch size - increasing the batch size increases the stability of the algorithm, but make learning slower
-    TRAINING_MIN_BATCH_SIZE = 0
+    TRAINING_MIN_BATCH_SIZE = 20
     
     # USE RNN - can help to converge but current version is much slower than FF
     USE_RNN = True
@@ -142,4 +153,4 @@ class Config:
     # Minimum policy
     MIN_POLICY = 0.0
     # Use log_softmax() instead of log(softmax())
-    USE_LOG_SOFTMAX = False
+    USE_LOG_SOFTMAX = True

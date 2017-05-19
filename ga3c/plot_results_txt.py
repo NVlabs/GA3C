@@ -77,14 +77,10 @@ def main():
         name = re.split( 'results_' , os.path.splitext(file)[0])[1]
         print(name)
         addplot(file, axarr, tableau20[i%20],name)
-    
-<<<<<<< HEAD
+
     scores = 'results.txt'
-
-    addplot(scores, axarr,tableau20[4],'batch16.lstm')
-=======
-
->>>>>>> e2892b5e0bf30befe4a16b217cab98073708c66b
+    if os.path.isfile(scores):
+        addplot(scores, axarr,tableau20[4],'current.lstm')
 
     plt.xlabel('hours')
     plt.ylabel('PongDeterministic-V0.score')
