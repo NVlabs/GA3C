@@ -113,10 +113,8 @@ class NetworkVP:
             self._state = self.d1
 
         self.logits_v = tf.squeeze(self.dense_layer(self._state, 1, 'logits_v', func=None), axis=[1])
-        self.cost_v = 0.5 * tf.reduce_sum(tf.square(self.y_r - self.logits_v), axis=0)
-
-
         self.logits_p = self.dense_layer(self.d1, self.num_actions, 'logits_p', func=None)   
+
         if Config.USE_LOG_SOFTMAX:
             self.softmax_p = tf.nn.softmax(self.logits_p)
             self.log_softmax_p = tf.nn.log_softmax(self.logits_p)

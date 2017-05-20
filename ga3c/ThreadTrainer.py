@@ -56,9 +56,9 @@ class ThreadTrainer(Thread):
             batch_size = 0
             lengths = []
             while batch_size <= Config.TRAINING_MIN_BATCH_SIZE:
-                idx, x_, r_, a_, td_, c_, h_ = self.server.training_q.get()
+                idx, x_, r_, td_, a_, c_, h_ = self.server.training_q.get()
                 
-                x_,r_,a_,t = ThreadTrainer._dynamic_pad(x_,r_,td_,a_)
+                x_,r_,td_,a_,t = ThreadTrainer._dynamic_pad(x_,r_,td_,a_)
                 lengths.append(t)
                 
                 if batch_size == 0:
