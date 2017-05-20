@@ -38,20 +38,40 @@ class ThreadTrainer(Thread):
         self.id = id
         self.server = server
         self.exit_flag = False
-
+        
+    @staticmethod
+    def _dynamic_pad(x_,r_,td_,a_):
+        t = x_.shape[0]
+        if t != Config.TIME_MAX and Config.USE_RNN:
+            xt = np.zeros((Config.TIME_MAX, Config.IMAGE_HEIGHT, Config.IMAGE_WIDTH, Config.STACKED_FRAMES),dtype=np.float32)
+            rt = np.zeros((Config.TIME_MAX),dtype=np.float32)
+            tdt = np.zeros((Config.TIME_MAX),dtype=np.float32)
+            at = np.zeros((Config.TIME_MAX, a_.shape[1]),dtype=np.float32)
+            xt[:t] = x_; rt[:t] = r_; at[:t] = a_; tdt[:t] = td_;
+            x_ = xt; r_ = rt; a_ = at; td_ = tdt;
+        return x_, r_, td_, a_, t 
+                    
     def run(self):
         while not self.exit_flag:
             batch_size = 0
+            lengths = []
             while batch_size <= Config.TRAINING_MIN_BATCH_SIZE:
-                x_, r_, a_, adv_ = self.server.training_q.get()
+                idx, x_, r_, a_, td_, c_, h_ = self.server.training_q.get()
+                
+                x_,r_,a_,t = ThreadTrainer._dynamic_pad(x_,r_,td_,a_)
+                lengths.append(t)
+                
                 if batch_size == 0:
-                    x__ = x_; r__ = r_; a__ = a_; adv__ = adv_
+                    x__ = x_; r__ = r_; a__ = a_; c__ = c_; h__ = h_;  td__ = td_;
                 else:
                     x__ = np.concatenate((x__, x_))
                     r__ = np.concatenate((r__, r_))
                     a__ = np.concatenate((a__, a_))
-                    adv__ = np.concatenate((adv__,adv_))
+                    td__ = np.concatenate((td__,td_))
+                    c__ = np.concatenate((c__, c_))
+                    h__ = np.concatenate((h__, h_))
                 batch_size += x_.shape[0]
-            
+
             if Config.TRAIN_MODELS:
-                self.server.train_model(x__, r__, a__, adv__, self.id)
+                self.server.train_model(x__, r__, td__, a__,c__,h__, lengths) 
+

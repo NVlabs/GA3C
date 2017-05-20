@@ -39,24 +39,40 @@ class ThreadPredictor(Thread):
         self.id = id
         self.server = server
         self.exit_flag = False
+        
+    def extract_q(self, q, ids, x, c, h, size=0):
+        ids[size], state = q.get()
+        xi,ci,hi = state
+        x[size], c[size], h[size] = xi,ci.squeeze(),hi.squeeze()
 
     def run(self):
         ids = np.zeros(Config.PREDICTION_BATCH_SIZE, dtype=np.uint16)
         states = np.zeros(
             (Config.PREDICTION_BATCH_SIZE, Config.IMAGE_HEIGHT, Config.IMAGE_WIDTH, Config.STACKED_FRAMES),
             dtype=np.float32)
+        cs = np.zeros(
+                (Config.PREDICTION_BATCH_SIZE, Config.NCELLS),
+                dtype=np.float32
+                )
+        hs = np.zeros(
+                (Config.PREDICTION_BATCH_SIZE, Config.NCELLS),
+                dtype=np.float32
+                )
 
         while not self.exit_flag:
-            ids[0], states[0] = self.server.prediction_q.get()
-
+            self.extract_q(self.server.prediction_q,ids,states,cs,hs,0)
             size = 1
             while size < Config.PREDICTION_BATCH_SIZE and not self.server.prediction_q.empty():
-                ids[size], states[size] = self.server.prediction_q.get()
+                self.extract_q(self.server.prediction_q,ids,states,cs,hs,size)
                 size += 1
 
             batch = states[:size]
-            p, v = self.server.model.predict_p_and_v(batch)
+            cb = cs[:size]
+            hb = hs[:size]
+            idx = ids[:size]
+
+            p, v, c, h = self.server.model.predict_p_and_v(batch, cb, hb)
 
             for i in range(size):
-                if ids[i] < len(self.server.agents):
-                    self.server.agents[ids[i]].wait_q.put((p[i], v[i]))
+                if idx[i] < len(self.server.agents):
+                    self.server.agents[idx[i]].wait_q.put((p[i], v[i], c[i], h[i]))

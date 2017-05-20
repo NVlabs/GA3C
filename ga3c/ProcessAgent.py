@@ -65,7 +65,7 @@ class ProcessAgent(Process):
             experiences[t].reward = reward_sum       
             delta_t = r + discount_factor * value_plus - experiences[t].value
             gae = gae * discount_factor * 1.0 + delta_t
-            experiences[t].adv = gae          
+            experiences[t].td = gae          
             value_plus = experiences[t].value
             
         return experiences[:-1]
@@ -75,18 +75,18 @@ class ProcessAgent(Process):
         a_ = np.eye(self.num_actions)[np.array([exp.action for exp in experiences])].astype(np.float32)
         r_ = np.array([exp.reward for exp in experiences])
         if Config.USE_GAE:
-            adv_ = np.array([exp.adv for exp in experiences])
+            td_ = np.array([exp.td for exp in experiences])
         else:
             v = np.array([exp.value for exp in experiences])
-            adv_ = r_ - v
-        return x_, r_, a_, adv_
+            td_ = r_ - v
+        return x_, r_, a_, td_
 
     def predict(self, state):
         # put the state in the prediction q
         self.prediction_q.put((self.id, state))
         # wait for the prediction to come back
-        p, v = self.wait_q.get()
-        return p, v
+        p, v, c, h = self.wait_q.get()
+        return p, v, c, h
 
     def select_action(self, prediction):
         if Config.PLAY_MODE:
@@ -102,7 +102,15 @@ class ProcessAgent(Process):
 
         time_count = 0
         reward_sum = 0.0
-        total_reward = 0.0
+     
+        rnn = {'c':np.zeros((1,Config.NCELLS),dtype=np.float32),
+               'h':np.zeros((1,Config.NCELLS),dtype=np.float32)
+               }
+        
+        init_rnn = {'c':np.zeros((1,Config.NCELLS),dtype=np.float32),
+                    'h':np.zeros((1,Config.NCELLS),dtype=np.float32)
+                    }
+
 
         while not done:
             # very first few frames
@@ -110,7 +118,13 @@ class ProcessAgent(Process):
                 self.env.step(0)  # 0 == NOOP
                 continue
 
-            prediction, value = self.predict(self.env.current_state)
+            state = (self.env.current_state,
+                 rnn['c'],
+                 rnn['h'])
+   
+    
+            prediction, value, rnn['c'][0], rnn['h'][0] = self.predict(state)
+                                  
             action = self.select_action(prediction)
             reward, done = self.env.step(action)
             reward_sum += reward
@@ -121,12 +135,12 @@ class ProcessAgent(Process):
                 terminal_reward = 0 if done else value
 
                 updated_exps = ProcessAgent._accumulate_rewards(experiences, self.discount_factor, terminal_reward)
-                if len(updated_exps) == 0:
-                    yield None, None, None, total_reward
-                else:
-                    x_, r_, a_, adv_ = self.convert_data(updated_exps)
-                    yield x_, r_, a_, adv_, reward_sum
 
+                x_, r_, a_, td_ = self.convert_data(updated_exps)
+                yield x_, r_, td_, a_, reward_sum, init_rnn['c'], init_rnn['h']
+
+                init_rnn['c'] = rnn['c'].copy()
+                init_rnn['h'] = rnn['h'].copy()
                 # reset the tmax count
                 time_count = 0
                 # keep the last experience for the next batch
@@ -143,10 +157,11 @@ class ProcessAgent(Process):
         while self.exit_flag.value == 0:
             total_reward = 0
             total_length = 0
-            for x_, r_, a_, adv_, reward_sum in self.run_episode():
+
+            for x_, r_, td_, a_, reward_sum, c0, h0 in self.run_episode():
                 total_reward += reward_sum
-                if x_ is None:
-                    break
                 total_length += len(r_) + 1  # +1 for last frame that we drop
-                self.training_q.put((x_, r_, a_, adv_))
+
+                self.training_q.put((self.id, x_, r_, td_, a_, c0, h0))
+
             self.episode_log_q.put((datetime.now(), total_reward, total_length))
