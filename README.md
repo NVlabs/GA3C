@@ -35,7 +35,7 @@ The output should look like below:
 **PPS** (predictions per second) demonstrates the speed of processing frames, while **Score** shows the achieved score.  
 **RPPS** and **RScore** are the rolling average of the above values.
 
-To stop the training procedure, adjuts `EPISODES` in `Config.py` propoerly, or simply use ctrl + c.
+To stop the training procedure, adjust `EPISODES` in `Config.py` propoerly, or simply use ctrl + c.
 
 ## How to continue training a model? ###
 
