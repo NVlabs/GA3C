@@ -58,7 +58,7 @@ class Environment:
         image = Environment._rgb2gray(image)
         ## Below method was deprecated in newer versions of scipy
         # image = misc.imresize(image, [Config.IMAGE_HEIGHT, Config.IMAGE_WIDTH], 'bilinear')
-        ## Alternative using cv2
+        ## Alternative using cv2 
         image = cv2.resize(image, dsize=(Config.IMAGE_HEIGHT, Config.IMAGE_WIDTH), interpolation=cv2.INTER_LINEAR)
         image = image.astype(np.float32) / 128.0 - 1.0
         return image
